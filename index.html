@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP Timer Supabase</title>
+<title>EXP</title>
 <style>
 body { font-family: Arial; background: #1a1a2e; color:#fff; text-align:center; margin:0; }
 .container { margin:20px; }
@@ -21,7 +21,7 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
 </head>
 <body>
 
-<h1>EXP Timer Supabase</h1>
+<h1>EXP</h1>
 
 <div class="container">
   <input id="newName" placeholder="Ім'я нового гравця">
@@ -38,29 +38,19 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
 
 <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
-<!-- Скрипт підключення Supabase і таймерів -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.umd.js"></script>
 <script>
-  // ====== Встав свої ключі Supabase ======
-  const SUPABASE_URL = 'https://gtleqxsiichgliwfkhbg.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_GTPV803deiaeT6Tikf3HHg_IknudqlS';
-  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = 'https://gtleqxsiichgliwfkhbg.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_GTPV803deiaeT6Tikf3HHg_IknudqlS';
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ====== Дані таймерів ======
-  let timerData = {};
-  let notified = {};
+let timerData = {};
+let notified = {};
 
-  function formatTime(sec){
-    let m=Math.floor(sec/60); 
-    let s=sec%60; 
-    return m+":"+(s<10?"0":"")+s; 
-  }
+function formatTime(sec){ let m=Math.floor(sec/60); let s=sec%60; return m+":"+(s<10?"0":"")+s; }
+function getCurrentTime(p){ return p.running ? Math.max(0,p.time - Math.floor((Date.now()-p.start)/1000)) : p.time; }
 
-  function getCurrentTime(p){
-    return p.running ? Math.max(0,p.time - Math.floor((Date.now()-p.start)/1000)) : p.time;
-  }
-
-  function createPlayer(name,p){
+function createPlayer(name,p){
     if(document.getElementById("player_"+name)) return;
     const div = document.createElement("div");
     div.id = "player_"+name;
@@ -76,28 +66,28 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
     document.getElementById("players").appendChild(div);
 
     div.querySelector(".pause-btn").onclick = async ()=>{
-        p.time = getCurrentTime(p);
-        p.running = false;
+        p.time=getCurrentTime(p);
+        p.running=false;
         await saveTimerSupabase(name,p);
     };
     div.querySelector(".resume-btn").onclick = async ()=>{
-        p.start = Date.now();
-        p.running = true;
+        p.start=Date.now();
+        p.running=true;
         await saveTimerSupabase(name,p);
     };
     div.querySelector(".add-btn").onclick = async ()=>{
         const val = parseInt(div.querySelector("input").value);
         if(!val) return;
-        p.time = getCurrentTime(p)+val*60;
-        p.start = Date.now();
+        p.time=getCurrentTime(p)+val*60;
+        p.start=Date.now();
         div.querySelector("input").value="";
-        notified[name] = false;
+        notified[name]=false;
         div.classList.remove("expired");
         await saveTimerSupabase(name,p);
     };
-  }
+}
 
-  function addNewPlayer(){
+function addNewPlayer(){
     const name = document.getElementById("newName").value.trim();
     const minutes = parseInt(document.getElementById("newMinutes").value);
     if(!name || !minutes) return;
@@ -105,56 +95,55 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
     if(timerData[name]){
         timerData[name].time += minutes*60;
     } else {
-        timerData[name] = {time:minutes*60,running:true,start:Date.now()};
+        timerData[name]={time:minutes*60,running:true,start:Date.now()};
         createPlayer(name,timerData[name]);
     }
 
     document.getElementById("newName").value="";
     document.getElementById("newMinutes").value="";
     saveTimerSupabase(name,timerData[name]);
-  }
+}
 
-  function pauseAll(){ 
+function pauseAll(){ 
     for(let n in timerData){
-        timerData[n].time = getCurrentTime(timerData[n]);
-        timerData[n].running = false;
+        timerData[n].time=getCurrentTime(timerData[n]);
+        timerData[n].running=false;
         saveTimerSupabase(n,timerData[n]);
     }
-  }
-
-  function resumeAll(){ 
+}
+function resumeAll(){ 
     for(let n in timerData){
-        timerData[n].start = Date.now();
-        timerData[n].running = true;
+        timerData[n].start=Date.now();
+        timerData[n].running=true;
         saveTimerSupabase(n,timerData[n]);
     }
-  }
+}
 
-  async function saveTimerSupabase(name,p){
+async function saveTimerSupabase(name,p){
     await supabase.from('timers').upsert({
-        name: name,
-        time: getCurrentTime(p),
-        running: p.running,
-        start: p.start
+        name:name,
+        time:getCurrentTime(p),
+        running:p.running,
+        start:p.start
     }, {onConflict:['name']});
-  }
+}
 
-  async function loadTimersSupabase(){
+async function loadTimersSupabase(){
     const {data,error} = await supabase.from('timers').select('*');
-    if(error){ console.error(error); return; }
+    if(error){ console.log(error); return; }
     data.forEach(p=>{
         if(!timerData[p.name]){
-            timerData[p.name] = {time:p.time,running:p.running,start:p.start};
+            timerData[p.name]={time:p.time,running:p.running,start:p.start};
             createPlayer(p.name,timerData[p.name]);
         } else {
-            timerData[p.name].time = p.time;
-            timerData[p.name].running = p.running;
-            timerData[p.name].start = p.start;
+            timerData[p.name].time=p.time;
+            timerData[p.name].running=p.running;
+            timerData[p.name].start=p.start;
         }
     });
-  }
+}
 
-  function updateTimers(){
+function updateTimers(){
     for(let name in timerData){
         const p = timerData[name];
         const span = document.querySelector("#player_"+name+" .time");
@@ -162,24 +151,18 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
         if(span){
             const t = getCurrentTime(p);
             span.innerText = formatTime(t);
-            if(t===0){ 
-                div.classList.add("expired"); 
-                if(!notified[name]){ 
-                    document.getElementById("alarm").play(); 
-                    notified[name] = true; 
-                } 
-            }
+            if(t===0){ div.classList.add("expired"); if(!notified[name]){ document.getElementById("alarm").play(); notified[name]=true; } }
         }
     }
-  }
+}
 
-  document.getElementById("addPlayerBtn").onclick = addNewPlayer;
-  document.getElementById("pauseAllBtn").onclick = pauseAll;
-  document.getElementById("resumeAllBtn").onclick = resumeAll;
+document.getElementById("addPlayerBtn").onclick = addNewPlayer;
+document.getElementById("pauseAllBtn").onclick = pauseAll;
+document.getElementById("resumeAllBtn").onclick = resumeAll;
 
-  setInterval(updateTimers,1000);
-  setInterval(loadTimersSupabase,3000);
-  loadTimersSupabase();
+setInterval(updateTimers,1000);
+setInterval(loadTimersSupabase,3000);
+loadTimersSupabase();
 </script>
 </body>
 </html>
