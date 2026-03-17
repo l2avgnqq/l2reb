@@ -2,34 +2,37 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP</title>
+<title>Supabase Test</title>
 </head>
 <body>
-<input id="newName" placeholder="Ім'я">
-<input id="newMinutes" type="number" placeholder="Хв">
-<button id="addPlayerBtn">Додати</button>
-<div id="players"></div>
+<h1>Supabase Test</h1>
+<input id="nameInput" placeholder="Ім'я">
+<button id="addBtn">Додати</button>
+<div id="output"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.umd.js"></script>
 <script>
-const SUPABASE_URL = 'https://gtleqxsiichgliwfkhbg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_GTPV803deiaeT6Tikf3HHg_IknudqlS';
+const SUPABASE_URL = 'sb_publishable_GTPV803deiaeT6Tikf3HHg_IknudqlS';
+const SUPABASE_ANON_KEY = 'sb_secret_kxJ86TvCukyUIAaZcrTQ9w_vNoC3szF';
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-async function addPlayer() {
-  const name = document.getElementById('newName').value.trim();
-  const minutes = parseInt(document.getElementById('newMinutes').value);
-  if(!name || !minutes) return alert('Введіть ім’я та час!');
+document.getElementById('addBtn').onclick = async () => {
+    const name = document.getElementById('nameInput').value.trim();
+    if(!name) return alert('Введіть ім’я');
 
-  const start = new Date().toISOString();
-  const time = minutes * 60;
+    const {data, error} = await supabase.from('timers').upsert({
+        name: name,
+        time: 60,
+        running: true,
+        start: new Date().toISOString()
+    });
 
-  const {data,error} = await supabase.from('timers').upsert({name,time,running:true,start});
-  if(error) return console.log(error);
-  document.getElementById('players').innerHTML += `<div>${name} - ${minutes} хв</div>`;
-}
-
-document.getElementById('addPlayerBtn').onclick = addPlayer;
+    if(error) {
+        document.getElementById('output').innerText = 'Помилка: ' + error.message;
+    } else {
+        document.getElementById('output').innerText = 'Додано: ' + JSON.stringify(data);
+    }
+};
 </script>
 </body>
 </html>
