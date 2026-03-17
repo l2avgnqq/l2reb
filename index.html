@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP</title>
+<title>Прокачка</title>
 <style>
 body { font-family: Arial; background: linear-gradient(135deg, #1a1a2e, #16213e); color:#fff; text-align:center; margin:0; }
 .container { margin:20px; }
@@ -39,7 +39,7 @@ input { width:50px; padding:3px; border-radius:5px; border:none; }
 
 <script>
 const binID = "69b9333dc3097a1dd531f977";
-const secretKey = "$2a$10$Ujj0JFN7XLAJbJ8UDLtUn.ZCC1uqhfYBySrybgbmRl/NQLLJZoBWG";
+const secretKey = "$2a$10$Ujj0JFN7XLAJbJ8UDLtUn.ZCC1uqhfYBySrybgbmRl/NQLLZoBWG";
 
 let timerData = { players:{} };
 let notified = {};
@@ -48,7 +48,7 @@ let notified = {};
 function formatTime(sec){ let m=Math.floor(sec/60); let s=sec%60; return m+":"+(s<10?"0":"")+s; }
 function getCurrentTime(p){ return p.running ? Math.max(0, p.time - Math.floor((Date.now()-p.start)/1000)) : p.time; }
 
-// Створюємо гравця лише один раз
+// Створюємо гравця один раз
 function createPlayer(name, p){
     const container = document.getElementById("players");
     const div = document.createElement("div");
