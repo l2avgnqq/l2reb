@@ -2,134 +2,108 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>Timer</title>
+<title>Спільний Таймер</title>
 <style>
-body {
-    font-family: Arial;
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    color: #fff;
-    text-align: center;
-    margin: 0;
-}
-.container { margin: 20px; }
-input { padding: 10px; margin: 5px; border-radius: 8px; border: none; }
-button { padding: 10px; margin: 5px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
-
-.add-btn { background: #00adb5; color: white; }
-.pause-btn { background: #f39c12; }
-.resume-btn { background: #2ecc71; }
-.time-btn { background: #3498db; }
-.delete-btn { background: #e74c3c; }
-.global-btn { background:#34495e; color:white; }
-
-.players {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-    padding: 20px;
-}
-.player {
-    background: rgba(255,255,255,0.08);
-    border-radius: 12px;
-    padding: 15px;
-}
+body { font-family: Arial; background: #1a1a2e; color: #fff; text-align: center; margin:0; }
+.players { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:15px; padding:20px; }
+.player { background: rgba(255,255,255,0.08); border-radius:12px; padding:15px; }
+button { margin-top:5px; padding:5px 10px; border-radius:6px; border:none; cursor:pointer; }
+.pause-btn{background:#f39c12;color:#fff;}
+.resume-btn{background:#2ecc71;color:#fff;}
+.add-btn{background:#3498db;color:#fff;}
+input { width:50px; padding:3px; border-radius:5px; border:none; }
 </style>
 </head>
 <body>
-
-<h1>Таймер</h1>
-
-<div class="container">
-    <input id="name" placeholder="Ім'я">
-    <input id="minutes" type="number" placeholder="Хвилини">
-    <button class="add-btn" onclick="addPlayer()">Додати / Додати час</button>
-</div>
-
-<button class="global-btn" onclick="pauseAll()">⏸ Пауза всім</button>
-<button class="global-btn" onclick="resumeAll()">▶ Продовжити всім</button>
-
+<h1>Спільний Таймер</h1>
 <div id="players" class="players"></div>
 
 <script>
-let players = JSON.parse(localStorage.getItem("players") || "{}");
-let playerElements = {};
+const binID = "69b9333dc3097a1dd531f977";
+const secretKey = "$2a$10$Ujj0JFN7XLAJbJ8UDLtUn.ZCC1uqhfYBySrybgbmRl/NQLLZoBWG";
 
-function save() { localStorage.setItem("players", JSON.stringify(players)); }
-function getCurrentTime(p) {
-    if(p.running) { return Math.max(0, p.time - Math.floor((Date.now()-p.start)/1000)); }
-    return p.time;
+let timerData = { players:{} };
+
+// Завантаження таймера з jsonbin.io
+async function loadTimer() {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${binID}/latest`, {
+        headers: { 'X-Master-Key': secretKey }
+    });
+    const data = await res.json();
+    timerData = data.record;
+    initPlayers();
 }
 
-function createPlayerElement(name) {
-    if(playerElements[name]) return;
-    const div = document.createElement("div");
-    div.className = "player";
-    div.innerHTML = `
-        <b>${name}</b><br><br>
-        Час: <span id="time_${name}">0:00</span><br><br>
-        <input type="number" placeholder="+ хв" id="input_${name}"><br>
-        <button class="pause-btn">Пауза</button>
-        <button class="resume-btn">Продовжити</button>
-        <button class="time-btn">Додати</button>
-        <button class="delete-btn">Видалити</button>
-    `;
-    const buttons = div.querySelectorAll("button");
-    buttons[0].onclick = () => pause(name);
-    buttons[1].onclick = () => resume(name);
-    buttons[2].onclick = () => addCustomTime(name);
-    buttons[3].onclick = () => removePlayer(name);
-    document.getElementById("players").appendChild(div);
-    playerElements[name] = div;
-}
-
-function addPlayer() {
-    const name = document.getElementById("name").value.trim();
-    const minutes = parseInt(document.getElementById("minutes").value);
-    if(!name || !minutes) return;
-    if(players[name]) {
-        let current = getCurrentTime(players[name]);
-        players[name].time = current + minutes*60;
-        players[name].start = Date.now();
-        players[name].running = true;
-    } else {
-        players[name] = {time: minutes*60, running:true, start:Date.now()};
-        createPlayerElement(name);
-    }
-    save();
-}
-
-function addCustomTime(name) {
-    let val = parseInt(document.getElementById("input_"+name).value);
-    if(!val) return;
-    let p = players[name];
-    let current = getCurrentTime(p);
-    p.time = current + val*60;
-    p.start = Date.now();
-    p.running = true;
-    save();
-}
-
-function pause(name) { let p=players[name]; if(p.running){ p.time=getCurrentTime(p); p.running=false; save(); } }
-function resume(name) { let p=players[name]; if(!p.running){ p.start=Date.now(); p.running=true; save(); } }
-function pauseAll(){ for(let n in players) pause(n); }
-function resumeAll(){ for(let n in players) resume(n); }
-function removePlayer(name){ delete players[name]; playerElements[name].remove(); delete playerElements[name]; save(); }
-
+// Формат часу
 function formatTime(sec){ let m=Math.floor(sec/60); let s=sec%60; return m+":"+(s<10?"0":"")+s; }
+function getCurrentTime(p){ return p.running ? Math.max(0, p.time - Math.floor((Date.now()-p.start)/1000)) : p.time; }
 
-function update(){
-    for(let name in players){
-        let current = getCurrentTime(players[name]);
-        let el = document.getElementById("time_"+name);
-        if(el) el.innerText = formatTime(current);
+// Створення блоків гравців
+function initPlayers() {
+    const container = document.getElementById("players");
+    container.innerHTML = "";
+    for(let name in timerData.players){
+        const p = timerData.players[name];
+        const div = document.createElement("div");
+        div.className = "player";
+        div.innerHTML = `
+            <b>${name}</b><br>
+            Час: <span>${formatTime(getCurrentTime(p))}</span><br>
+            <button class="pause-btn">Пауза</button>
+            <button class="resume-btn">Продовжити</button>
+            <input type="number" placeholder="+ хв">
+            <button class="add-btn">Додати</button>
+        `;
+        container.appendChild(div);
+
+        const pauseBtn = div.querySelector(".pause-btn");
+        const resumeBtn = div.querySelector(".resume-btn");
+        const addBtn = div.querySelector(".add-btn");
+        const input = div.querySelector("input");
+
+        pauseBtn.onclick = () => { pause(name); saveTimer(); };
+        resumeBtn.onclick = () => { resume(name); saveTimer(); };
+        addBtn.onclick = () => {
+            const val = parseInt(input.value);
+            if(!val) return;
+            addTime(name, val*60);
+            input.value = "";
+            saveTimer();
+        };
     }
 }
 
-function init(){ for(let name in players) createPlayerElement(name); }
+// Функції управління часом
+function pause(name){ let p=timerData.players[name]; if(p.running){ p.time=getCurrentTime(p); p.running=false; } }
+function resume(name){ let p=timerData.players[name]; if(!p.running){ p.start=Date.now(); p.running=true; } }
+function addTime(name, sec){ let p=timerData.players[name]; p.time=getCurrentTime(p)+sec; p.start=Date.now(); }
 
-init();
-setInterval(update,1000);
+// Збереження змін у jsonbin.io
+async function saveTimer() {
+    await fetch(`https://api.jsonbin.io/v3/b/${binID}`, {
+        method: "PUT",
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': secretKey
+        },
+        body: JSON.stringify(timerData)
+    });
+}
+
+// Оновлення часу на екрані щосекунди
+setInterval(() => {
+    for(let name in timerData.players){
+        const p = timerData.players[name];
+        const divs = document.querySelectorAll(".player");
+        divs.forEach(div => {
+            if(div.querySelector("b").innerText === name){
+                div.querySelector("span").innerText = formatTime(getCurrentTime(p));
+            }
+        });
+    }
+}, 1000);
+
+loadTimer();
 </script>
-
 </body>
 </html>
