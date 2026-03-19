@@ -5,7 +5,7 @@
 <title>EXP Lineage2</title>
 
 <style>
-body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
+body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:left; }
 
 input, button {
     padding:6px;
@@ -21,20 +21,23 @@ button { cursor:pointer; font-weight:bold; }
 
 .global { background:#34495e; color:white; }
 
+/* ⬅️ тепер зліва */
 .players {
     display:flex;
     flex-direction:column;
     padding:20px;
     max-width:700px;
-    margin:0 auto;
+    margin:0;
+    align-items:flex-start;
 }
 
-/* рядок як в таблиці */
+/* рядок як Excel */
 .player {
     display:flex;
     align-items:center;
     gap:10px;
 
+    width:100%;
     background:rgba(255,255,255,0.05);
     padding:8px;
     border-bottom:1px solid rgba(255,255,255,0.2);
@@ -86,7 +89,6 @@ button { cursor:pointer; font-weight:bold; }
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
-
 const ADENA_PER_SEC = 12000000 / 3600;
 
 let db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -194,7 +196,6 @@ function render(){
             await save(name,p);
         };
 
-        // ✅ правильне видалення без дублювання адени
         div.querySelector(".delete").onclick = async ()=>{
             delete data[name];
             delete lastTime[name];
