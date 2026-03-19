@@ -11,7 +11,7 @@ body {
     color:#fff;
 }
 
-/* верх по центру */
+/* верх */
 .top {
     text-align:center;
 }
@@ -30,17 +30,16 @@ button { cursor:pointer; font-weight:bold; }
 
 .global { background:#34495e; color:white; }
 
-/* список зліва */
+/* список */
 .players {
     display:flex;
     flex-direction:column;
     padding:20px;
     max-width:700px;
     margin:0;
-    align-items:flex-start;
 }
 
-/* рядки */
+/* рядок */
 .player {
     display:flex;
     align-items:center;
@@ -123,12 +122,12 @@ function current(p){
     return Math.max(0, p.time - diff);
 }
 
-/* ✅ ГОЛОВНЕ ВИПРАВЛЕННЯ */
+/* 🔥 LOAD ТІЛЬКИ 1 РАЗ */
 async function load(){
     const {data:rows} = await db.from("timers").select("*");
 
-    let newData = {};
     let total = 0;
+    let newData = {};
 
     rows.forEach(p=>{
         newData[p.name] = p;
@@ -137,7 +136,7 @@ async function load(){
 
     data = newData;
     totalAdenaGlobal = total;
-    lastTime = {}; // щоб не було дубля
+    lastTime = {};
 }
 
 async function updateAdena(){
@@ -156,9 +155,9 @@ async function updateAdena(){
 
                 totalAdenaGlobal += gained;
 
-                await db.from("timers").update({
-                    adena: p.adena
-                }).eq("name", name);
+                await db.from("timers")
+                    .update({adena: p.adena})
+                    .eq("name", name);
             }
         }
 
@@ -304,7 +303,8 @@ document.getElementById("pauseAll").onclick = pauseAll;
 document.getElementById("resumeAll").onclick = resumeAll;
 document.getElementById("clearAll").onclick = clearAll;
 
-setInterval(load,1000);
+/* 🚀 правильні цикли */
+load();
 setInterval(render,1000);
 setInterval(updateAdena,1000);
 
