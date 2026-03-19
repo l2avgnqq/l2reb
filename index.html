@@ -11,9 +11,7 @@ body {
     color:#fff;
 }
 
-.top {
-    text-align:center;
-}
+.top { text-align:center; }
 
 input, button {
     padding:6px;
@@ -92,8 +90,6 @@ button { cursor:pointer; font-weight:bold; }
 <script>
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
-
-
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADENA_PER_SEC = 12000000 / 3600;
@@ -102,25 +98,31 @@ let data = {};
 let lastTime = {};
 let totalAdenaGlobal = 0;
 
-/* ---------- FIXED FUNCTIONS ---------- */
+/* ---------- CORE ---------- */
 
 function format(s){
+    s = Number(s);
     if(isNaN(s) || s < 0) s = 0;
     let m = Math.floor(s/60);
-    let sec = s%60;
-    return m + ":" + (sec<10?"0":"") + sec;
+    let sec = s % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
 }
 
 function current(p){
-    if(!p || isNaN(p.time)) return 0;
+    if(!p) return 0;
 
-    if(!p.running) return p.time;
-    if(!p.start) return p.time;
+    let base = Number(p.time) || 0;
 
-    let diff = Math.floor((Date.now() - new Date(p.start)) / 1000);
-    if(isNaN(diff)) return p.time;
+    if(!p.running) return base;
+    if(!p.start) return base;
 
-    return Math.max(0, p.time - diff);
+    let start = new Date(p.start).getTime();
+    if(!start) return base;
+
+    let diff = Math.floor((Date.now() - start)/1000);
+    if(isNaN(diff) || diff < 0) return base;
+
+    return Math.max(0, base - diff);
 }
 
 /* ---------- LOAD ---------- */
@@ -132,11 +134,16 @@ async function load(){
     let newData = {};
 
     rows.forEach(p=>{
-        p.time = p.time || 0;
-        p.adena = p.adena || 0;
+        let clean = {
+            name: p.name,
+            time: Number(p.time) || 0,
+            running: !!p.running,
+            start: p.start || null,
+            adena: Number(p.adena) || 0
+        };
 
-        newData[p.name] = p;
-        total += p.adena;
+        newData[p.name] = clean;
+        total += clean.adena;
     });
 
     data = newData;
@@ -244,22 +251,22 @@ function render(){
 async function save(name,p){
     await db.from("timers").upsert({
         name: name,
-        time: p.time || 0,
-        running: p.running || false,
+        time: Number(p.time) || 0,
+        running: !!p.running,
         start: p.start,
-        adena: p.adena || 0
+        adena: Number(p.adena) || 0
     });
 }
 
 /* ---------- ACTIONS ---------- */
 
 async function add(){
-    const name = document.getElementById("name").value;
+    const name = document.getElementById("name").value.trim();
     const min = parseInt(document.getElementById("minutes").value);
 
     if(!name || !min || min <= 0) return;
 
-    let p = data[name] || {adena:0};
+    let p = data[name] || {time:0, adena:0};
 
     p.time = current(p) + min*60;
     p.start = new Date().toISOString();
