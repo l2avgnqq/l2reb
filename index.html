@@ -2,29 +2,58 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>РЕБОРН ТАЙМЕР</title>
+<title>EXP реборн</title>
 
 <style>
 body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
-input, button { padding:8px; margin:5px; border-radius:8px; border:none; }
-button { cursor:pointer; }
-.player { background:rgba(255,255,255,0.1); padding:10px; margin:10px; border-radius:10px; }
+
+input, button {
+    padding:8px;
+    margin:5px;
+    border-radius:8px;
+    border:none;
+}
+
+button { cursor:pointer; font-weight:bold; }
+
+#addBtn { background:#e74c3c; color:white; } /* 🔥 новий колір */
+
+.global { background:#34495e; color:white; }
+
+.players {
+    display:grid;
+    grid-template-columns: repeat(3, 1fr); /* 🔥 3 в ряд */
+    gap:15px;
+    padding:20px;
+}
+
+.player {
+    background:rgba(255,255,255,0.1);
+    padding:10px;
+    border-radius:10px;
+}
+
 .pause { background:#f39c12; }
 .resume { background:#2ecc71; }
 .add { background:#3498db; }
+
 .expired { background:rgba(255,0,0,0.4); }
 </style>
 
 </head>
 <body>
 
-<h1>РЕБОРН</h1>
+<h1>EXP л2</h1>
 
 <input id="name" placeholder="Ім'я">
 <input id="minutes" type="number" placeholder="Хв">
 <button id="addBtn">Додати</button>
 
-<div id="players"></div>
+<br>
+<button id="pauseAll" class="global">⏸ Пауза всім</button>
+<button id="resumeAll" class="global">▶ Старт всім</button>
+
+<div id="players" class="players"></div>
 
 <audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
 
@@ -34,7 +63,7 @@ button { cursor:pointer; }
 (function(){
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = "ТВОЙ_КЛЮЧ";
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
 
 let db;
 
@@ -110,12 +139,14 @@ function create(name){
 }
 
 async function save(name,p){
-    await db.from("timers").upsert({
+    const { error } = await db.from("timers").upsert({
         name:name,
         time:p.time,
         running:p.running,
         start:p.start
     });
+
+    if(error) console.log("SAVE ERROR:", error);
 }
 
 async function load(){
@@ -156,6 +187,16 @@ async function add(){
 
     if(!name || !min) return;
 
+    if(data[name]){
+        // 🔥 якщо вже є — додаємо час
+        let p = data[name];
+        p.time = current(p) + min*60;
+        p.start = new Date().toISOString();
+        p.running = true;
+        await save(name,p);
+        return;
+    }
+
     let p = {
         time:min*60,
         running:true,
@@ -167,8 +208,28 @@ async function add(){
     await save(name,p);
 }
 
+function pauseAll(){
+    for(let name in data){
+        let p = data[name];
+        p.time = current(p);
+        p.running = false;
+        save(name,p);
+    }
+}
+
+function resumeAll(){
+    for(let name in data){
+        let p = data[name];
+        p.start = new Date().toISOString();
+        p.running = true;
+        save(name,p);
+    }
+}
+
 function init(){
     document.getElementById("addBtn").onclick = add;
+    document.getElementById("pauseAll").onclick = pauseAll;
+    document.getElementById("resumeAll").onclick = resumeAll;
 
     load();
     setInterval(update,1000);
