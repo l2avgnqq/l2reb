@@ -29,7 +29,7 @@ button { cursor:pointer; font-weight:bold; }
     margin:0 auto;
 }
 
-/* ✅ РЯДКИ ЯК В EXCEL */
+/* рядок як в таблиці */
 .player {
     display:flex;
     align-items:center;
@@ -86,8 +86,8 @@ button { cursor:pointer; font-weight:bold; }
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
-const ADENA_PER_SEC = 12000000 / 3600;
 
+const ADENA_PER_SEC = 12000000 / 3600;
 
 let db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -145,7 +145,7 @@ function render(){
     let arr = Object.entries(data);
     arr.sort((a,b)=> current(a[1]) - current(b[1]));
 
-    arr.forEach(([name,p])=>{
+    arr.forEach(([name,p], index)=>{
         const div = document.createElement("div");
         div.className = "player";
 
@@ -155,6 +155,7 @@ function render(){
         if(t === 0) div.classList.add("danger");
 
         div.innerHTML = `
+            <span style="width:30px;">${index+1}.</span>
             <span style="width:140px;"><b>${name}</b></span>
             <span style="width:80px;">${format(t)}</span>
 
@@ -193,14 +194,10 @@ function render(){
             await save(name,p);
         };
 
+        // ✅ правильне видалення без дублювання адени
         div.querySelector(".delete").onclick = async ()=>{
-            let p = data[name];
-
-            if(p && p.adena){
-                totalAdenaGlobal += p.adena;
-            }
-
             delete data[name];
+            delete lastTime[name];
 
             await db.from("timers").delete().eq("name", name);
         };
