@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP Lineage2</title>
+<title>EXP LINEAGE2</title>
 
 <style>
 body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
@@ -44,11 +44,11 @@ button { cursor:pointer; font-weight:bold; }
     color:#f1c40f;
 }
 </style>
-
 </head>
+
 <body>
 
-<h1>EXP Lineage2</h1>
+<h1>EXP LINEAGE2</h1>
 
 <input id="name" placeholder="Ім'я">
 <input id="minutes" type="number" placeholder="Хв">
@@ -76,7 +76,6 @@ let db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data = {};
 let lastTime = {};
-let totalAdena = 0;
 
 function format(s){
     let m = Math.floor(s/60);
@@ -94,27 +93,34 @@ function current(p){
     return Math.max(0, p.time - diff);
 }
 
-function updateAdena(){
-    let gained = 0;
+async function updateAdena(){
+    let total = 0;
 
     for(let name in data){
-        let now = current(data[name]);
+        let p = data[name];
+        let now = current(p);
 
         if(lastTime[name] !== undefined){
             let diff = lastTime[name] - now;
 
             if(diff > 0){
-                gained += diff;
+                let gained = Math.floor(diff * ADENA_PER_SEC);
+
+                p.adena = (p.adena || 0) + gained;
+
+                // 🔥 збереження
+                await db.from("timers").update({
+                    adena: p.adena
+                }).eq("name", name);
             }
         }
 
         lastTime[name] = now;
+        total += (p.adena || 0);
     }
 
-    totalAdena += gained * ADENA_PER_SEC;
-
     document.getElementById("adena").innerText =
-        "💰 Adena: " + Math.floor(totalAdena).toLocaleString();
+        "💰 Adena: " + total.toLocaleString();
 }
 
 function create(name){
@@ -174,7 +180,8 @@ async function save(name,p){
         name:name,
         time:p.time,
         running:p.running,
-        start:p.start
+        start:p.start,
+        adena: p.adena || 0
     });
 }
 
@@ -201,19 +208,13 @@ async function load(){
     data = newData;
 }
 
-function update(){
+function updateUI(){
     for(let name in data){
-        let p = data[name];
-        let t = current(p);
-
+        let t = current(data[name]);
         let el = document.querySelector("#"+name+" .time");
 
-        if(el){
-            el.innerText = format(t);
-        }
+        if(el) el.innerText = format(t);
     }
-
-    updateAdena();
 }
 
 async function add(){
@@ -234,7 +235,8 @@ async function add(){
     let p = {
         time:min*60,
         running:true,
-        start:new Date().toISOString()
+        start:new Date().toISOString(),
+        adena: 0
     };
 
     data[name]=p;
@@ -265,7 +267,6 @@ async function clearAll(){
     await db.from("timers").delete().neq("name","");
     data = {};
     lastTime = {};
-    totalAdena = 0;
     document.getElementById("players").innerHTML = "";
 }
 
@@ -274,8 +275,9 @@ document.getElementById("pauseAll").onclick = pauseAll;
 document.getElementById("resumeAll").onclick = resumeAll;
 document.getElementById("clearAll").onclick = clearAll;
 
-setInterval(load, 1000);   // 🔥 псевдо realtime
-setInterval(update, 1000); // 🔥 логіка + адена
+setInterval(load, 1000);
+setInterval(updateUI, 1000);
+setInterval(updateAdena, 1000);
 
 })();
 </script>
