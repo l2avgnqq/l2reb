@@ -1,85 +1,8 @@
 <!DOCTYPE html>
-<html lang="uk">
-<head>
-<meta charset="UTF-8">
-<title>EXP</title>
-
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
-<style>
-body { background:#111; color:#fff; font-family:Arial; }
-button { margin:5px; padding:5px; cursor:pointer; }
-</style>
-</head>
-
+<html>
 <body>
 
-<input id="name" placeholder="Ім'я">
-<input id="minutes" type="number" placeholder="Хв">
-<button onclick="add()">Додати</button>
-
-<div id="players"></div>
-
-<script>
-// ❗ СПОЧАТКУ ПРОВІРЯЄМО SUPABASE
-let db = null;
-
-try {
-    db = supabase.createClient(
-        "https://mxwtlfkhykqegzytotlq.supabase.co",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE";
-    );
-} catch(e){
-    console.log("SUPABASE ERROR", e);
-}
-
-// ---------- ДАНІ ----------
-let data = {};
-
-// ---------- РЕНДЕР ----------
-function render(){
-    let div = document.getElementById("players");
-    div.innerHTML = "";
-
-    for(let name in data){
-        let p = data[name];
-
-        div.innerHTML += `
-            <div>
-                ${name} | ${p.time}
-                <button onclick="pause('${name}')">pause</button>
-            </div>
-        `;
-    }
-}
-
-// ---------- ACTIONS ----------
-function add(){
-    console.log("CLICK ADD");
-
-    let name = document.getElementById("name").value;
-    let min = parseInt(document.getElementById("minutes").value);
-
-    if(!name || !min) return;
-
-    data[name] = {time:min*60};
-
-    render();
-}
-
-function pause(name){
-    console.log("CLICK PAUSE");
-
-    if(data[name]){
-        data[name].time = 0;
-    }
-
-    render();
-}
-
-// ---------- INIT ----------
-render();
-</script>
+<button onclick="alert('OK')">CLICK</button>
 
 </body>
 </html>
