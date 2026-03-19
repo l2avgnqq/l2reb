@@ -11,7 +11,7 @@ body {
     color:#fff;
 }
 
-/* 🔹 ВЕРХ ПО ЦЕНТРУ */
+/* верх по центру */
 .top {
     text-align:center;
 }
@@ -30,7 +30,7 @@ button { cursor:pointer; font-weight:bold; }
 
 .global { background:#34495e; color:white; }
 
-/* 🔹 СПИСОК ЗЛІВА */
+/* список зліва */
 .players {
     display:flex;
     flex-direction:column;
@@ -40,7 +40,7 @@ button { cursor:pointer; font-weight:bold; }
     align-items:flex-start;
 }
 
-/* 🔹 РЯДОК ЯК ТАБЛИЦЯ */
+/* рядки */
 .player {
     display:flex;
     align-items:center;
@@ -121,6 +121,23 @@ function current(p){
 
     let diff = Math.floor((Date.now() - new Date(p.start)) / 1000);
     return Math.max(0, p.time - diff);
+}
+
+/* ✅ ГОЛОВНЕ ВИПРАВЛЕННЯ */
+async function load(){
+    const {data:rows} = await db.from("timers").select("*");
+
+    let newData = {};
+    let total = 0;
+
+    rows.forEach(p=>{
+        newData[p.name] = p;
+        total += (p.adena || 0);
+    });
+
+    data = newData;
+    totalAdenaGlobal = total;
+    lastTime = {}; // щоб не було дубля
 }
 
 async function updateAdena(){
@@ -211,7 +228,6 @@ function render(){
         div.querySelector(".delete").onclick = async ()=>{
             delete data[name];
             delete lastTime[name];
-
             await db.from("timers").delete().eq("name", name);
         };
     });
@@ -227,36 +243,17 @@ async function save(name,p){
     });
 }
 
-async function load(){
-    const {data:rows} = await db.from("timers").select("*");
-
-    let newData = {};
-    rows.forEach(p=> newData[p.name] = p);
-
-    data = newData;
-}
-
 async function add(){
     const name = document.getElementById("name").value;
     const min = parseInt(document.getElementById("minutes").value);
 
     if(!name || isNaN(min) || min <= 0) return;
 
-    if(data[name]){
-        let p = data[name];
-        p.time = current(p) + min*60;
-        p.start = new Date().toISOString();
-        p.running = true;
-        await save(name,p);
-        return;
-    }
+    let p = data[name] || {adena:0};
 
-    let p = {
-        time:min*60,
-        running:true,
-        start:new Date().toISOString(),
-        adena:0
-    };
+    p.time = current(p) + min*60;
+    p.start = new Date().toISOString();
+    p.running = true;
 
     data[name]=p;
     await save(name,p);
@@ -297,6 +294,8 @@ function resumeAll(){
 async function clearAll(){
     await db.from("timers").delete().neq("name","");
     data = {};
+    lastTime = {};
+    totalAdenaGlobal = 0;
 }
 
 document.getElementById("addBtn").onclick = add;
