@@ -86,7 +86,7 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const ADENA_PER_SEC = 12000000 / 3600;
 
 let data = {};
-let alerted = {};
+let totalAdena = 0;
 
 /* ---------- CORE ---------- */
 function updatePlayer(p){
@@ -100,8 +100,12 @@ function updatePlayer(p){
 
     let worked = Math.min(diff, p.time);
 
+    let earned = worked * ADENA_PER_SEC;
+
     p.time -= worked;
-    p.adena += worked * ADENA_PER_SEC;
+    p.adena += earned;
+    totalAdena += earned;
+
     p.last_update = now.toISOString();
 
     if(p.time <= 0){
@@ -112,29 +116,15 @@ function updatePlayer(p){
 
 /* ---------- LOAD ---------- */
 async function load(){
-    let {data:rows, error} = await db.from("timers").select("*");
-
-    if(error){
-        console.log(error);
-        return;
-    }
+    let {data:rows} = await db.from("timers").select("*");
 
     let obj = {};
 
     rows.forEach(p=>{
-
-        // 🔥 ЖОРСТКИЙ ФІКС
-        let isRunning = !!p.running;
-
-        // якщо час вже 0 → точно не працює
-        if(p.time <= 0){
-            isRunning = false;
-        }
-
         obj[p.name] = {
             name:p.name,
             time:Number(p.time)||0,
-            running:isRunning,
+            running:!!p.running,
             adena:Number(p.adena)||0,
             last_update:p.last_update
         };
@@ -167,11 +157,8 @@ function render(){
     const container = document.getElementById("players");
     container.innerHTML = "";
 
-    let total = 0;
-
     Object.values(data).forEach(p=>{
         updatePlayer(p);
-        total += p.adena;
     });
 
     let arr = Object.values(data).sort((a,b)=> a.time - b.time);
@@ -206,7 +193,7 @@ function render(){
     });
 
     document.getElementById("adena").innerText =
-        "💰 Adena: " + Math.floor(total).toLocaleString();
+        "💰 Adena: " + Math.floor(totalAdena).toLocaleString();
 }
 
 /* ---------- ACTIONS ---------- */
@@ -253,14 +240,10 @@ async function pause(name){
     let p = data[name];
 
     updatePlayer(p);
-
     p.running = false;
     p.last_update = new Date().toISOString();
 
     await save(p);
-
-    // 🔥 примусове оновлення локально
-    data[name] = {...p};
 }
 
 async function resume(name){
@@ -295,20 +278,15 @@ async function addAll(){
 }
 
 async function pauseAll(){
-
     for(let name in data){
         let p = data[name];
 
         updatePlayer(p);
-
         p.running = false;
         p.last_update = new Date().toISOString();
 
-        await save(p); // ❗ ЧЕКАЄМО КОЖНОГО
+        await save(p);
     }
-
-    // 🔥 ПІСЛЯ ВСЬОГО ПЕРЕЗАГРУЖАЄМО
-    await load();
 }
 
 async function resumeAll(){
@@ -325,6 +303,7 @@ async function resumeAll(){
 async function clearAll(){
     await db.from("timers").delete().neq("name","");
     data = {};
+    totalAdena = 0;
 }
 
 /* ---------- INIT ---------- */
