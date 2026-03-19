@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP l2</title>
+<title>EXP Timer</title>
 
 <style>
 body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
@@ -36,6 +36,7 @@ button { cursor:pointer; font-weight:bold; }
 .pause { background:#f39c12; }
 .resume { background:#2ecc71; }
 .add { background:#3498db; }
+.delete { background:#c0392b; color:white; }
 
 .expired { background:rgba(255,0,0,0.4); }
 </style>
@@ -43,7 +44,7 @@ button { cursor:pointer; font-weight:bold; }
 </head>
 <body>
 
-<h1>EXP</h1>
+<h1>EXP Timer</h1>
 
 <input id="name" placeholder="Ім'я">
 <input id="minutes" type="number" placeholder="Хв">
@@ -52,6 +53,7 @@ button { cursor:pointer; font-weight:bold; }
 <br>
 <button id="pauseAll" class="global">⏸ Пауза всім</button>
 <button id="resumeAll" class="global">▶ Старт всім</button>
+<button id="clearAll" class="global">🧹 Очистити всіх</button>
 
 <div id="players" class="players"></div>
 
@@ -63,7 +65,7 @@ button { cursor:pointer; font-weight:bold; }
 (function(){
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
+const SUPABASE_KEY = "ТВОЙ_КЛЮЧ";
 
 let db;
 
@@ -85,12 +87,10 @@ function format(s){
 
 function current(p){
     if(!p.running) return p.time;
-
-    if(!p.start) return p.time; // 🔥 FIX
+    if(!p.start) return p.time;
 
     let diff = Math.floor((Date.now() - new Date(p.start)) / 1000);
-
-    if(isNaN(diff)) return p.time; // 🔥 FIX
+    if(isNaN(diff)) return p.time;
 
     return Math.max(0, p.time - diff);
 }
@@ -103,7 +103,7 @@ function create(name){
     div.className = "player";
 
     div.innerHTML = `
-        <b>${name}</b><br>
+        <b>${name}</b> <button class="delete">❌</button><br>
         <span class="time">0:00</span><br><br>
 
         <button class="pause">⏸</button>
@@ -119,7 +119,7 @@ function create(name){
         let p = data[name];
         p.time = current(p);
         p.running = false;
-        p.start = null; // 🔥 FIX
+        p.start = null;
         await save(name,p);
     };
 
@@ -144,11 +144,20 @@ function create(name){
 
         await save(name,p);
     };
+
+    div.querySelector(".delete").onclick = async ()=>{
+        if(!confirm("Видалити " + name + "?")) return;
+
+        await db.from("timers").delete().eq("name", name);
+
+        delete data[name];
+        div.remove();
+    };
 }
 
 async function save(name,p){
     if(!p.start && p.running){
-        p.start = new Date().toISOString(); // 🔥 FIX
+        p.start = new Date().toISOString();
     }
 
     const { error } = await db.from("timers").upsert({
@@ -166,7 +175,7 @@ async function load(){
 
     rows.forEach(p=>{
         if(!p.start && p.running){
-            p.start = new Date().toISOString(); // 🔥 FIX
+            p.start = new Date().toISOString();
         }
         data[p.name]=p;
         create(p.name);
@@ -241,10 +250,20 @@ function resumeAll(){
     }
 }
 
+async function clearAll(){
+    if(!confirm("Очистити ВСІХ?")) return;
+
+    await db.from("timers").delete().neq("name", "");
+
+    data = {};
+    document.getElementById("players").innerHTML = "";
+}
+
 function init(){
     document.getElementById("addBtn").onclick = add;
     document.getElementById("pauseAll").onclick = pauseAll;
     document.getElementById("resumeAll").onclick = resumeAll;
+    document.getElementById("clearAll").onclick = clearAll;
 
     load();
     setInterval(update,1000);
