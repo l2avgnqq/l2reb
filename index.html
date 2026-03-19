@@ -11,7 +11,6 @@ body {
     color:#fff;
 }
 
-/* верх */
 .top {
     text-align:center;
 }
@@ -27,10 +26,8 @@ button { cursor:pointer; font-weight:bold; }
 
 #addBtn { background:#e74c3c; color:white; }
 #addAllBtn { background:#9b59b6; color:white; }
-
 .global { background:#34495e; color:white; }
 
-/* список */
 .players {
     display:flex;
     flex-direction:column;
@@ -39,12 +36,10 @@ button { cursor:pointer; font-weight:bold; }
     margin:0;
 }
 
-/* рядок */
 .player {
     display:flex;
     align-items:center;
     gap:10px;
-
     width:100%;
     background:rgba(255,255,255,0.05);
     padding:8px;
@@ -90,39 +85,46 @@ button { cursor:pointer; font-weight:bold; }
 </div>
 
 <div id="players" class="players"></div>
-
 <div id="adena">💰 Adena: 0</div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-(function(){
-
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
-const ADENA_PER_SEC = 12000000 / 3600;
 
-let db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const ADENA_PER_SEC = 12000000 / 3600;
 
 let data = {};
 let lastTime = {};
 let totalAdenaGlobal = 0;
 
+/* ---------- FIXED FUNCTIONS ---------- */
+
 function format(s){
+    if(isNaN(s) || s < 0) s = 0;
     let m = Math.floor(s/60);
     let sec = s%60;
-    return m+":"+(sec<10?"0":"")+sec;
+    return m + ":" + (sec<10?"0":"") + sec;
 }
 
 function current(p){
+    if(!p || isNaN(p.time)) return 0;
+
     if(!p.running) return p.time;
     if(!p.start) return p.time;
 
     let diff = Math.floor((Date.now() - new Date(p.start)) / 1000);
+    if(isNaN(diff)) return p.time;
+
     return Math.max(0, p.time - diff);
 }
 
-/* 🔥 LOAD ТІЛЬКИ 1 РАЗ */
+/* ---------- LOAD ---------- */
+
 async function load(){
     const {data:rows} = await db.from("timers").select("*");
 
@@ -130,8 +132,11 @@ async function load(){
     let newData = {};
 
     rows.forEach(p=>{
+        p.time = p.time || 0;
+        p.adena = p.adena || 0;
+
         newData[p.name] = p;
-        total += (p.adena || 0);
+        total += p.adena;
     });
 
     data = newData;
@@ -139,9 +144,9 @@ async function load(){
     lastTime = {};
 }
 
-async function updateAdena(){
-    let total = totalAdenaGlobal;
+/* ---------- ADENA ---------- */
 
+async function updateAdena(){
     for(let name in data){
         let p = data[name];
         let now = current(p);
@@ -151,8 +156,8 @@ async function updateAdena(){
 
             if(diff > 0){
                 let gained = Math.floor(diff * ADENA_PER_SEC);
-                p.adena = (p.adena || 0) + gained;
 
+                p.adena += gained;
                 totalAdenaGlobal += gained;
 
                 await db.from("timers")
@@ -165,8 +170,10 @@ async function updateAdena(){
     }
 
     document.getElementById("adena").innerText =
-        "💰 Adena: " + total.toLocaleString();
+        "💰 Adena: " + totalAdenaGlobal.toLocaleString();
 }
+
+/* ---------- RENDER ---------- */
 
 function render(){
     const container = document.getElementById("players");
@@ -215,7 +222,7 @@ function render(){
 
         div.querySelector(".add").onclick = async ()=>{
             let val = parseInt(div.querySelector("input").value);
-            if(isNaN(val) || val <= 0) return;
+            if(!val || val <= 0) return;
 
             p.time = current(p) + val*60;
             p.start = new Date().toISOString();
@@ -232,21 +239,25 @@ function render(){
     });
 }
 
+/* ---------- SAVE ---------- */
+
 async function save(name,p){
     await db.from("timers").upsert({
-        name:name,
-        time:p.time,
-        running:p.running,
-        start:p.start,
-        adena:p.adena || 0
+        name: name,
+        time: p.time || 0,
+        running: p.running || false,
+        start: p.start,
+        adena: p.adena || 0
     });
 }
+
+/* ---------- ACTIONS ---------- */
 
 async function add(){
     const name = document.getElementById("name").value;
     const min = parseInt(document.getElementById("minutes").value);
 
-    if(!name || isNaN(min) || min <= 0) return;
+    if(!name || !min || min <= 0) return;
 
     let p = data[name] || {adena:0};
 
@@ -254,13 +265,13 @@ async function add(){
     p.start = new Date().toISOString();
     p.running = true;
 
-    data[name]=p;
+    data[name] = p;
     await save(name,p);
 }
 
 async function addAll(){
     let min = parseInt(document.getElementById("allMinutes").value);
-    if(isNaN(min) || min <= 0) return;
+    if(!min || min <= 0) return;
 
     for(let name in data){
         let p = data[name];
@@ -297,18 +308,18 @@ async function clearAll(){
     totalAdenaGlobal = 0;
 }
 
+/* ---------- INIT ---------- */
+
 document.getElementById("addBtn").onclick = add;
 document.getElementById("addAllBtn").onclick = addAll;
 document.getElementById("pauseAll").onclick = pauseAll;
 document.getElementById("resumeAll").onclick = resumeAll;
 document.getElementById("clearAll").onclick = clearAll;
 
-/* 🚀 правильні цикли */
 load();
 setInterval(render,1000);
 setInterval(updateAdena,1000);
 
-})();
 </script>
 
 </body>
