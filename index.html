@@ -77,10 +77,10 @@ button { cursor:pointer; font-weight:bold; }
 <div id="adena">💰 0</div>
 
 <script>
-const db = supabase.createClient(
-    "https://mxwtlfkhykqegzytotlq.supabase.co",
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
-);
+const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE";
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const ADENA_PER_SEC = 12000000 / 3600;
 
@@ -112,9 +112,11 @@ function updatePlayer(p){
 /* ---------- LOAD ---------- */
 async function load(){
     let res = await db.from("timers").select("*");
+
     if(!res.data) return;
 
     let obj = {};
+
     res.data.forEach(p=>{
         obj[p.name] = {
             name:p.name,
@@ -130,7 +132,13 @@ async function load(){
 
 /* ---------- SAVE ---------- */
 async function save(name,p){
-    await db.from("timers").upsert(p);
+    await db.from("timers").upsert({
+        name:name,
+        time:p.time,
+        running:p.running,
+        adena:p.adena,
+        last_update:p.last_update
+    });
 }
 
 /* ---------- RENDER ---------- */
