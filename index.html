@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP реборн</title>
+<title>EXP l2</title>
 
 <style>
 body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
@@ -16,13 +16,13 @@ input, button {
 
 button { cursor:pointer; font-weight:bold; }
 
-#addBtn { background:#e74c3c; color:white; } /* 🔥 новий колір */
+#addBtn { background:#e74c3c; color:white; }
 
 .global { background:#34495e; color:white; }
 
 .players {
     display:grid;
-    grid-template-columns: repeat(3, 1fr); /* 🔥 3 в ряд */
+    grid-template-columns: repeat(3, 1fr);
     gap:15px;
     padding:20px;
 }
@@ -43,7 +43,7 @@ button { cursor:pointer; font-weight:bold; }
 </head>
 <body>
 
-<h1>EXP л2</h1>
+<h1>EXP</h1>
 
 <input id="name" placeholder="Ім'я">
 <input id="minutes" type="number" placeholder="Хв">
@@ -85,7 +85,14 @@ function format(s){
 
 function current(p){
     if(!p.running) return p.time;
-    return Math.max(0, p.time - Math.floor((Date.now()-new Date(p.start))/1000));
+
+    if(!p.start) return p.time; // 🔥 FIX
+
+    let diff = Math.floor((Date.now() - new Date(p.start)) / 1000);
+
+    if(isNaN(diff)) return p.time; // 🔥 FIX
+
+    return Math.max(0, p.time - diff);
 }
 
 function create(name){
@@ -112,6 +119,7 @@ function create(name){
         let p = data[name];
         p.time = current(p);
         p.running = false;
+        p.start = null; // 🔥 FIX
         await save(name,p);
     };
 
@@ -139,6 +147,10 @@ function create(name){
 }
 
 async function save(name,p){
+    if(!p.start && p.running){
+        p.start = new Date().toISOString(); // 🔥 FIX
+    }
+
     const { error } = await db.from("timers").upsert({
         name:name,
         time:p.time,
@@ -153,6 +165,9 @@ async function load(){
     const {data:rows} = await db.from("timers").select("*");
 
     rows.forEach(p=>{
+        if(!p.start && p.running){
+            p.start = new Date().toISOString(); // 🔥 FIX
+        }
         data[p.name]=p;
         create(p.name);
     });
@@ -188,7 +203,6 @@ async function add(){
     if(!name || !min) return;
 
     if(data[name]){
-        // 🔥 якщо вже є — додаємо час
         let p = data[name];
         p.time = current(p) + min*60;
         p.start = new Date().toISOString();
@@ -213,6 +227,7 @@ function pauseAll(){
         let p = data[name];
         p.time = current(p);
         p.running = false;
+        p.start = null;
         save(name,p);
     }
 }
