@@ -2,84 +2,66 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP Timer Online</title>
+<title>EXP </title>
 
 <style>
-body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; margin:0; }
-.container { margin:20px; }
-input, button { padding:8px; margin:5px; border-radius:8px; border:none; }
-button { font-weight:bold; cursor:pointer; }
-.add-player-btn { background:#00adb5; color:#fff; }
-.global-btn { background:#34495e; color:white; }
-.players { display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:15px; padding:20px; }
-.player { background: rgba(255,255,255,0.08); border-radius:12px; padding:15px; }
-.pause-btn { background:#f39c12; color:#fff; }
-.resume-btn { background:#2ecc71; color:#fff; }
-.add-btn { background:#3498db; color:#fff; }
-input { width:60px; }
-.expired { background: rgba(255,0,0,0.4); }
+body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
+input, button { padding:10px; margin:5px; border-radius:8px; border:none; }
+button { cursor:pointer; background:#00adb5; color:white; }
+.player { background:rgba(255,255,255,0.1); margin:10px; padding:10px; border-radius:10px; }
 </style>
 
 </head>
 <body>
 
-<h1>EXP Timer Online</h1>
+<h1>EXP </h1>
 
-<div class="container">
-  <input id="newName" placeholder="Ім'я">
-  <input id="newMinutes" type="number" placeholder="Хв">
-  <button id="addPlayerBtn">Додати</button>
-</div>
+<input id="name" placeholder="Ім'я">
+<input id="minutes" type="number" placeholder="Хвилини">
+<button id="add">Додати</button>
 
-<div id="players" class="players"></div>
+<div id="list"></div>
 
+<!-- ПРАВИЛЬНИЙ SUPABASE -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
-const SUPABASE_URL = 'https://mxwtlfkhykqegzytotlq.supabase.co';
+document.addEventListener("DOMContentLoaded", () => {
+
+const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
 
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let timerData = {};
-
-function createPlayer(name, time){
-    const div = document.createElement("div");
-    div.className = "player";
-
-    div.innerHTML = `
-        <b>${name}</b><br>
-        <span>${time}s</span>
-    `;
-
-    document.getElementById("players").appendChild(div);
-}
+const list = document.getElementById("list");
 
 async function load(){
-    const {data,error} = await client.from('timers').select('*');
+    const { data, error } = await db.from("timers").select("*");
 
     if(error){
         console.log("LOAD ERROR:", error);
         return;
     }
 
-    document.getElementById("players").innerHTML = "";
+    list.innerHTML = "";
 
     data.forEach(p=>{
-        createPlayer(p.name, p.time);
+        const div = document.createElement("div");
+        div.className = "player";
+        div.innerHTML = `<b>${p.name}</b> — ${p.time} сек`;
+        list.appendChild(div);
     });
 }
 
-async function addPlayer(){
-    const name = document.getElementById("newName").value;
-    const min = parseInt(document.getElementById("newMinutes").value);
+async function add(){
+    const name = document.getElementById("name").value;
+    const min = parseInt(document.getElementById("minutes").value);
 
     if(!name || !min) return;
 
-    const {error} = await client.from('timers').insert({
+    const { error } = await db.from("timers").insert({
         name: name,
-        time: min*60
+        time: min * 60
     });
 
     if(error){
@@ -89,9 +71,11 @@ async function addPlayer(){
     load();
 }
 
-document.getElementById("addPlayerBtn").onclick = addPlayer;
+document.getElementById("add").onclick = add;
 
 load();
+
+});
 </script>
 
 </body>
