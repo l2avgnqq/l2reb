@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP </title>
+<title>EXP Timer</title>
 
 <style>
 body { font-family: Arial; background:#1a1a2e; color:#fff; text-align:center; }
@@ -14,26 +14,53 @@ button { cursor:pointer; background:#00adb5; color:white; }
 </head>
 <body>
 
-<h1>EXP </h1>
+<h1>EXP Timer</h1>
 
 <input id="name" placeholder="Ім'я">
 <input id="minutes" type="number" placeholder="Хвилини">
-<button id="add">Додати</button>
+<button id="addBtn">Додати</button>
 
 <div id="list"></div>
 
-<!-- ПРАВИЛЬНИЙ SUPABASE -->
+<!-- ГАРАНТОВАНО ПРАЦЮЮЧИЙ SUPABASE -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", () => {
+(function(){
 
+// 🔥 ЛОГ щоб перевірити що JS працює
+console.log("JS OK");
+
+// 🔑 ТВОЇ ДАНІ
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE";
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let db;
 
-const list = document.getElementById("list");
+// 🔧 Чекаємо поки supabase підгрузиться
+function waitForSupabase(){
+    if(window.supabase){
+        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        init();
+    } else {
+        setTimeout(waitForSupabase, 100);
+    }
+}
+
+function init(){
+    console.log("INIT OK");
+
+    const btn = document.getElementById("addBtn");
+
+    if(!btn){
+        console.log("BUTTON NOT FOUND");
+        return;
+    }
+
+    btn.addEventListener("click", addPlayer);
+
+    load();
+}
 
 async function load(){
     const { data, error } = await db.from("timers").select("*");
@@ -43,6 +70,7 @@ async function load(){
         return;
     }
 
+    const list = document.getElementById("list");
     list.innerHTML = "";
 
     data.forEach(p=>{
@@ -53,11 +81,16 @@ async function load(){
     });
 }
 
-async function add(){
+async function addPlayer(){
+    alert("Клік працює ✅");
+
     const name = document.getElementById("name").value;
     const min = parseInt(document.getElementById("minutes").value);
 
-    if(!name || !min) return;
+    if(!name || !min){
+        alert("Введи дані");
+        return;
+    }
 
     const { error } = await db.from("timers").insert({
         name: name,
@@ -66,16 +99,17 @@ async function add(){
 
     if(error){
         console.log("SAVE ERROR:", error);
+        alert("Помилка запису");
+        return;
     }
 
     load();
 }
 
-document.getElementById("add").onclick = add;
+// старт
+waitForSupabase();
 
-load();
-
-});
+})();
 </script>
 
 </body>
