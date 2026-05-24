@@ -1,130 +1,90 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>L2 EXP Stable</title>
+<title>EXP Lineage2</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body {
-    margin:0;
-    font-family: Arial;
-    background:#0f0f0f;
-    color:#fff;
-}
-
-.top {
-    text-align:center;
-    padding:10px;
-}
+body { font-family: Arial; background:#1a1a2e; color:#fff; }
+.top { text-align:center; }
 
 input, button {
-    margin:3px;
     padding:6px;
+    margin:3px;
+    border-radius:6px;
+    border:none;
+}
+
+button { cursor:pointer; font-weight:bold; }
+
+#addBtn { background:#e74c3c; color:white; }
+#addAllBtn { background:#9b59b6; color:white; }
+.global { background:#34495e; color:white; }
+
+.players {
+    padding:20px;
+    max-width:700px;
 }
 
 .player {
     display:flex;
+    align-items:center;
     gap:10px;
     padding:8px;
-    border-bottom:1px solid #333;
+    border-bottom:1px solid rgba(255,255,255,0.2);
 }
 
-.warning { background:#332200; }
-.danger { background:#330000; }
+.warning { background:rgba(255,165,0,0.3); }
+.danger { background:rgba(255,0,0,0.4); }
 </style>
 </head>
 
 <body>
 
 <div class="top">
-    <h2>EXP Lineage2</h2>
+    <h1>EXP Lineage2</h1>
 
-    <input id="name" placeholder="Name">
-    <input id="minutes" type="number" placeholder="Min">
-    <button onclick="add()">Add</button>
+    <input id="name" placeholder="Имя">
+    <input id="minutes" type="number" placeholder="Мин">
+    <button id="addBtn">Добавить</button>
 
     <br>
 
-    <input id="allMinutes" type="number" placeholder="+ all min">
-    <button onclick="addAll()">Add all</button>
+    <input id="allMinutes" type="number" placeholder="+мин всем">
+    <button id="addAllBtn">Добавить всем</button>
 
-    <button onclick="pauseAll()">Pause</button>
-    <button onclick="resumeAll()">Start</button>
-    <button onclick="clearAll()">Clear</button>
+    <br>
+
+    <button id="pauseAll" class="global">⏸ Пауза всем</button>
+    <button id="resumeAll" class="global">▶ Старт всем</button>
+    <button id="clearAll" class="global">🧹 Очистить всех</button>
 </div>
 
-<div id="players"></div>
+<div id="players" class="players"></div>
 
 <script>
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = "YOUR_ANON_KEY";
+const SUPABASE_KEY = 'YOUR_KEY';
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data = {};
 
-/* ---------- LOAD ---------- */
-async function load(){
-    const { data:rows, error } = await db
-        .from("timers")
-        .select("*");
-
-    if(error){
-        console.log("LOAD ERROR:", error.message);
-        return;
-    }
-
-    data = {};
-    rows.forEach(r => {
-        data[r.id] = r;
-    });
-}
-
-/* ---------- SAVE (100% FIXED) ---------- */
-async function save(p){
-    if(!p.id){
-        const { data:inserted, error } = await db
-            .from("timers")
-            .insert([p])
-            .select()
-            .single();
-
-        if(error){
-            console.log("INSERT ERROR:", error.message);
-            return;
-        }
-
-        data[inserted.id] = inserted;
-    } else {
-        const { error } = await db
-            .from("timers")
-            .update(p)
-            .eq("id", p.id);
-
-        if(error){
-            console.log("UPDATE ERROR:", error.message);
-        }
-    }
-}
-
-/* ---------- DELETE ---------- */
-async function del(id){
-    await db.from("timers").delete().eq("id", id);
-    delete data[id];
-}
-
 /* ---------- TIME ---------- */
 function updateTime(p){
     if(!p.running) return;
 
-    let diff = Math.floor((Date.now() - new Date(p.last_update))/1000);
+    let last = new Date(p.last_update);
+    let diff = Math.floor((Date.now() - last)/1000);
 
-    let used = Math.min(diff, p.time);
+    if(diff <= 0) return;
 
-    p.time -= used;
+    let worked = Math.min(diff, p.time);
+
+    p.time -= worked;
     p.last_update = new Date().toISOString();
 
     if(p.time <= 0){
@@ -133,38 +93,70 @@ function updateTime(p){
     }
 }
 
+/* ---------- LOAD ---------- */
+async function load(){
+    let {data:rows} = await db.from("timers").select("*");
+
+    let obj = {};
+
+    (rows || []).forEach(p=>{
+        obj[p.name] = {
+            name:p.name,
+            time:Number(p.time)||0,
+            running:!!p.running,
+            last_update:p.last_update
+        };
+    });
+
+    data = obj;
+}
+
+/* ---------- SAVE ---------- */
+async function save(p){
+    await db.from("timers").upsert(p);
+}
+
 /* ---------- FORMAT ---------- */
 function format(s){
-    return Math.floor(s/60)+":"+(s%60).toString().padStart(2,"0");
+    let m = Math.floor(s/60);
+    let sec = s%60;
+    return m + ":" + sec.toString().padStart(2,"0");
 }
 
 /* ---------- RENDER ---------- */
 function render(){
-    const el = document.getElementById("players");
-    el.innerHTML = "";
+    const container = document.getElementById("players");
+    container.innerHTML = "";
 
-    Object.values(data).forEach(updateTime);
+    Object.values(data).forEach(p=>{
+        updateTime(p);
+    });
 
-    Object.values(data)
-    .sort((a,b)=>a.time-b.time)
-    .forEach((p,i)=>{
+    let arr = Object.values(data).sort((a,b)=> a.time - b.time);
 
-        let div = document.createElement("div");
+    arr.forEach((p, index)=>{
+
+        const div = document.createElement("div");
         div.className = "player";
 
-        if(p.time < 300) div.classList.add("warning");
-        if(p.time < 60) div.classList.add("danger");
+        if(p.time <= 300 && p.time > 60) div.classList.add("warning");
+        if(p.time <= 60 && p.time > 0) div.classList.add("danger");
 
         div.innerHTML = `
-            <b>${p.name}</b>
-            <span>${format(p.time)}</span>
+            <span style="width:30px;">${index+1}.</span>
+            <span style="width:120px;"><b>${p.name}</b></span>
+            <span style="width:80px;">${format(p.time)}</span>
 
-            <button onclick="pause('${p.id}')">Pause</button>
-            <button onclick="resume('${p.id}')">Start</button>
-            <button onclick="del('${p.id}')">X</button>
+            <button onclick="pause('${p.name}')">⏸</button>
+            <button onclick="resume('${p.name}')">▶</button>
+
+            <input type="number" id="add_${p.name}" placeholder="+мин" style="width:60px;">
+            <button onclick="addTime('${p.name}')">+</button>
+
+            <button onclick="delPlayer('${p.name}')">❌</button>
         `;
 
-        el.appendChild(div);
+        container.appendChild(div);
     });
 }
 
@@ -176,38 +168,84 @@ async function add(){
 
     if(!name || !min) return;
 
-    let p = {
-        name,
-        time: min*60,
-        running:true,
+    let p = data[name] || {
+        name:name,
+        time:0,
+        running:false,
         last_update:new Date().toISOString()
     };
 
-    await save(p);
-}
-
-async function pause(id){
-    let p = data[id];
     updateTime(p);
-    p.running = false;
-    await save(p);
-}
 
-async function resume(id){
-    let p = data[id];
+    p.time += min*60;
     p.running = true;
     p.last_update = new Date().toISOString();
+
+    data[name] = p;
+
     await save(p);
+
+    render();
+}
+
+async function addTime(name){
+    let val = parseInt(document.getElementById("add_"+name).value);
+
+    if(!val) return;
+
+    let p = data[name];
+
+    updateTime(p);
+
+    p.time += val*60;
+    p.running = true;
+    p.last_update = new Date().toISOString();
+
+    await save(p);
+
+    render();
+}
+
+async function pause(name){
+    let p = data[name];
+
+    updateTime(p);
+
+    p.running = false;
+
+    await save(p);
+
+    render();
+}
+
+async function resume(name){
+    let p = data[name];
+
+    p.running = true;
+    p.last_update = new Date().toISOString();
+
+    await save(p);
+
+    render();
+}
+
+async function delPlayer(name){
+    await db.from("timers").delete().eq("name", name);
+
+    delete data[name];
+
+    render();
 }
 
 /* ---------- GLOBAL ---------- */
 
 async function addAll(){
     let min = parseInt(document.getElementById("allMinutes").value);
+
     if(!min) return;
 
-    for(let id in data){
-        let p = data[id];
+    for(let name in data){
+        let p = data[name];
 
         updateTime(p);
 
@@ -217,32 +255,52 @@ async function addAll(){
 
         await save(p);
     }
+
+    render();
 }
 
 async function pauseAll(){
-    for(let id in data){
-        let p = data[id];
+    for(let name in data){
+        let p = data[name];
+
         updateTime(p);
+
         p.running = false;
+
         await save(p);
     }
+
+    render();
 }
 
 async function resumeAll(){
-    for(let id in data){
-        let p = data[id];
+    for(let name in data){
+        let p = data[name];
+
         p.running = true;
         p.last_update = new Date().toISOString();
+
         await save(p);
     }
+
+    render();
 }
 
 async function clearAll(){
-    await db.from("timers").delete().neq("id","");
+    await db.from("timers").delete().neq("name","");
+
     data = {};
+
+    render();
 }
 
 /* ---------- INIT ---------- */
+
+document.getElementById("addBtn").onclick = add;
+document.getElementById("addAllBtn").onclick = addAll;
+document.getElementById("pauseAll").onclick = pauseAll;
+document.getElementById("resumeAll").onclick = resumeAll;
+document.getElementById("clearAll").onclick = clearAll;
 
 async function init(){
     await load();
@@ -250,6 +308,7 @@ async function init(){
 }
 
 init();
+
 setInterval(render,1000);
 
 </script>
