@@ -39,8 +39,8 @@ button { cursor:pointer; font-weight:bold; }
 .warning { background:rgba(255,165,0,0.3); }
 .danger { background:rgba(255,0,0,0.4); }
 
-#adena {
-    font-size:22px;
+#bank {
+    font-size:18px;
     margin-top:20px;
     color:#f1c40f;
     padding-left:20px;
@@ -53,24 +53,31 @@ button { cursor:pointer; font-weight:bold; }
 <div class="top">
     <h1>EXP Lineage2</h1>
 
-    <input id="name" placeholder="Ім'я">
-    <input id="minutes" type="number" placeholder="Хв">
-    <button id="addBtn">Додати</button>
+    <input id="name" placeholder="Имя">
+    <input id="minutes" type="number" placeholder="Мин">
+    <button id="addBtn">Добавить</button>
 
     <br>
 
-    <input id="allMinutes" type="number" placeholder="+хв всім">
-    <button id="addAllBtn">Додати всім</button>
+    <input id="allMinutes" type="number" placeholder="+мин всем">
+    <button id="addAllBtn">Добавить всем</button>
 
     <br>
 
-    <button id="pauseAll" class="global">⏸ Пауза всім</button>
-    <button id="resumeAll" class="global">▶ Старт всім</button>
-    <button id="clearAll" class="global">🧹 Очистити всіх</button>
+    <button id="pauseAll" class="global">⏸ Остановить всех</button>
+    <button id="resumeAll" class="global">▶ Запустить всех</button>
+    <button id="clearAll" class="global">🧹 Очистить всех</button>
 </div>
 
 <div id="players" class="players"></div>
-<div id="adena">💰 0</div>
+
+<div id="bank">
+    💰 Bank: <span id="coinTotal">0</span> Coin of Luck
+    <br><br>
+
+    <input id="manualCoins" type="number" placeholder="Добавить Coin of Luck">
+    <button onclick="addCoins()">Добавить в банк</button>
+</div>
 
 <script>
 
@@ -79,10 +86,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const PRICE_PER_MIN = 200000;
-
 let data = {};
-let totalAdena = 0;
+let totalCoins = 0;
 
 /* ---------- TIME ---------- */
 function updateTime(p){
@@ -161,7 +166,7 @@ function render(){
             <button onclick="pause('${p.name}')">⏸</button>
             <button onclick="resume('${p.name}')">▶</button>
 
-            <input type="number" id="add_${p.name}" placeholder="+хв" style="width:60px;">
+            <input type="number" id="add_${p.name}" placeholder="+мин" style="width:60px;">
             <button onclick="addTime('${p.name}')">+</button>
 
             <button onclick="delPlayer('${p.name}')">❌</button>
@@ -170,8 +175,19 @@ function render(){
         container.appendChild(div);
     });
 
-    document.getElementById("adena").innerText =
-        "💰 Adena: " + totalAdena.toLocaleString();
+    document.getElementById("coinTotal").innerText =
+        totalCoins.toLocaleString();
+}
+
+/* ---------- COINS ---------- */
+function addCoins(){
+    let val = parseInt(document.getElementById("manualCoins").value);
+    if(!val) return;
+
+    totalCoins += val;
+
+    document.getElementById("coinTotal").innerText =
+        totalCoins.toLocaleString();
 }
 
 /* ---------- ACTIONS ---------- */
@@ -194,8 +210,6 @@ async function add(){
     p.running = true;
     p.last_update = new Date().toISOString();
 
-    totalAdena += min * PRICE_PER_MIN; // 🔥 одразу в банк
-
     data[name] = p;
     await save(p);
 }
@@ -211,8 +225,6 @@ async function addTime(name){
     p.time += val*60;
     p.running = true;
     p.last_update = new Date().toISOString();
-
-    totalAdena += val * PRICE_PER_MIN; // 🔥
 
     await save(p);
 }
@@ -251,8 +263,6 @@ async function addAll(){
         p.running = true;
         p.last_update = new Date().toISOString();
 
-        totalAdena += min * PRICE_PER_MIN;
-
         await save(p);
     }
 }
@@ -278,7 +288,7 @@ async function resumeAll(){
 async function clearAll(){
     await db.from("timers").delete().neq("name","");
     data = {};
-    totalAdena = 0;
+    totalCoins = 0;
 }
 
 /* ---------- INIT ---------- */
@@ -289,12 +299,13 @@ document.getElementById("pauseAll").onclick = pauseAll;
 document.getElementById("resumeAll").onclick = resumeAll;
 document.getElementById("clearAll").onclick = clearAll;
 
+init();
+
 async function init(){
     await load();
     render();
 }
 
-init();
 setInterval(render,1000);
 
 </script>
