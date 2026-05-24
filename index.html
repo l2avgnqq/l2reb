@@ -23,7 +23,10 @@ button { cursor:pointer; font-weight:bold; }
 #addAllBtn { background:#9b59b6; color:white; }
 .global { background:#34495e; color:white; }
 
-.players { padding:20px; max-width:700px; }
+.players {
+    padding:20px;
+    max-width:700px;
+}
 
 .player {
     display:flex;
@@ -43,20 +46,20 @@ button { cursor:pointer; font-weight:bold; }
 
 <h1>EXP Lineage2</h1>
 
-<input id="name" placeholder="Имя">
-<input id="minutes" type="number" placeholder="Мин">
-<button id="addBtn">Добавить</button>
+<input id="name" placeholder="Ім'я">
+<input id="minutes" type="number" placeholder="Хвилини">
+<button id="addBtn">Додати</button>
 
 <br>
 
-<input id="allMinutes" type="number" placeholder="+мин всем">
-<button id="addAllBtn">Добавить всем</button>
+<input id="allMinutes" type="number" placeholder="+ всім хв">
+<button id="addAllBtn">Додати всім</button>
 
 <br>
 
-<button id="pauseAll" class="global">⏸ Пауза всем</button>
-<button id="resumeAll" class="global">▶ Старт всем</button>
-<button id="clearAll" class="global">🧹 Очистить всех</button>
+<button id="pauseAll">⏸ Пауза всім</button>
+<button id="resumeAll">▶ Старт всім</button>
+<button id="clearAll">🧹 Очистити</button>
 
 </div>
 
@@ -65,7 +68,9 @@ button { cursor:pointer; font-weight:bold; }
 <script>
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = "sb_secret_j_kfoOlSUk0veK2YmoZeCQ_5YPM0Fmi";
+
+// 🔥 ВСТАВ СЮДИ ТІЛЬКИ ANON KEY
+const SUPABASE_KEY = "sb_secret_xQrVzQTdndV7dt1STXCPLQ_6g-xKY5h";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -78,7 +83,7 @@ async function load(){
         .select("*");
 
     if(error){
-        console.log(error);
+        console.log("LOAD ERROR:", error);
         return;
     }
 
@@ -92,21 +97,23 @@ async function load(){
 async function save(p){
     const { error } = await db
         .from("timers")
-        .upsert(p);
+        .upsert(p, { onConflict: "name" });
 
-    if(error) console.log(error);
+    if(error){
+        console.log("SAVE ERROR:", error);
+    }
 }
 
-/* ---------- TIME ENGINE ---------- */
+/* ---------- TIME UPDATE ---------- */
 function updateTime(p){
     if(!p.running) return;
 
-    const last = new Date(p.last_update);
+    const last = new Date(p.last_update || Date.now());
     const diff = Math.floor((Date.now() - last) / 1000);
 
     if(diff <= 0) return;
 
-    const worked = Math.min(diff, p.time);
+    const worked = Math.min(diff, p.time || 0);
 
     p.time -= worked;
     p.last_update = new Date().toISOString();
@@ -122,7 +129,9 @@ function render(){
     const container = document.getElementById("players");
     container.innerHTML = "";
 
-    Object.values(data).forEach(updateTime);
+    Object.values(data).forEach(p=>{
+        if(p.running) updateTime(p);
+    });
 
     const arr = Object.values(data).sort((a,b)=>a.time-b.time);
 
@@ -153,17 +162,17 @@ function render(){
 
 /* ---------- ACTIONS ---------- */
 
-function validateName(name){
+function validate(name){
     return name && name.trim().length > 0;
 }
 
 async function add(){
 
-    let name = document.getElementById("name").value.trim();
-    let min = parseInt(document.getElementById("minutes").value);
+    const name = document.getElementById("name").value.trim();
+    const min = parseInt(document.getElementById("minutes").value);
 
-    if(!validateName(name) || !min){
-        alert("Введи нормальне ім'я і хвилини");
+    if(!validate(name) || !min){
+        alert("Введи ім'я і хвилини");
         return;
     }
 
@@ -173,8 +182,6 @@ async function add(){
         running: false,
         last_update: new Date().toISOString()
     };
-
-    updateTime(p);
 
     p.time += min * 60;
     p.running = true;
@@ -187,12 +194,10 @@ async function add(){
 
 async function addTime(name){
 
-    let val = parseInt(document.getElementById("add_"+name).value);
+    const val = parseInt(document.getElementById("add_"+name).value);
     if(!val) return;
 
     let p = data[name];
-
-    updateTime(p);
 
     p.time += val * 60;
     p.running = true;
@@ -205,7 +210,6 @@ async function addTime(name){
 
 async function pause(name){
     let p = data[name];
-    updateTime(p);
     p.running = false;
     await save(p);
     render();
@@ -228,12 +232,11 @@ async function delPlayer(name){
 /* ---------- GLOBAL ---------- */
 
 async function addAll(){
-    let min = parseInt(document.getElementById("allMinutes").value);
+    const min = parseInt(document.getElementById("allMinutes").value);
     if(!min) return;
 
-    for(let name in data){
+    for(const name in data){
         let p = data[name];
-        updateTime(p);
 
         p.time += min * 60;
         p.running = true;
@@ -247,9 +250,8 @@ async function addAll(){
 }
 
 async function pauseAll(){
-    for(let name in data){
+    for(const name in data){
         let p = data[name];
-        updateTime(p);
         p.running = false;
         await save(p);
     }
@@ -257,7 +259,7 @@ async function pauseAll(){
 }
 
 async function resumeAll(){
-    for(let name in data){
+    for(const name in data){
         let p = data[name];
         p.running = true;
         p.last_update = new Date().toISOString();
@@ -286,14 +288,6 @@ async function init(){
 }
 
 init();
-
-/* realtime sync */
-db.channel('timers')
-  .on('postgres_changes',
-    { event: '*', schema: 'public', table: 'timers' },
-    () => load().then(render)
-  )
-  .subscribe();
 
 setInterval(render, 1000);
 
