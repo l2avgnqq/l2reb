@@ -38,13 +38,6 @@ button { cursor:pointer; font-weight:bold; }
 
 .warning { background:rgba(255,165,0,0.3); }
 .danger { background:rgba(255,0,0,0.4); }
-
-#bank {
-    font-size:18px;
-    margin-top:20px;
-    color:#f1c40f;
-    padding-left:20px;
-}
 </style>
 </head>
 
@@ -71,23 +64,14 @@ button { cursor:pointer; font-weight:bold; }
 
 <div id="players" class="players"></div>
 
-<div id="bank">
-    💰 Bank: <span id="coinTotal">0</span> Coin of Luck
-    <br><br>
-
-    <input id="manualCoins" type="number" placeholder="Добавить Coin of Luck">
-    <button onclick="addCoins()">Добавить в банк</button>
-</div>
-
 <script>
 
 const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14d3RsZmtoeWtxZWd6eXRvdGxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDI0NDIsImV4cCI6MjA4OTQ3ODQ0Mn0.S5riWE26dEnXANPF070BYmoUDqHgMyPcue-KRr-ugvE';
+const SUPABASE_KEY = "YOUR_ANON_KEY";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data = {};
-let totalCoins = 0;
 
 /* ---------- TIME ---------- */
 function updateTime(p){
@@ -95,8 +79,6 @@ function updateTime(p){
 
     let last = new Date(p.last_update);
     let diff = Math.floor((Date.now() - last)/1000);
-
-    if(diff <= 0) return;
 
     let worked = Math.min(diff, p.time);
 
@@ -116,12 +98,7 @@ async function load(){
     let obj = {};
 
     rows.forEach(p=>{
-        obj[p.name] = {
-            name:p.name,
-            time:Number(p.time)||0,
-            running:!!p.running,
-            last_update:p.last_update
-        };
+        obj[p.name] = p;
     });
 
     data = obj;
@@ -130,6 +107,11 @@ async function load(){
 /* ---------- SAVE ---------- */
 async function save(p){
     await db.from("timers").upsert(p);
+}
+
+/* ---------- DELETE ---------- */
+async function delPlayer(name){
+    await db.from("timers").delete().eq("name", name);
 }
 
 /* ---------- FORMAT ---------- */
@@ -174,20 +156,6 @@ function render(){
 
         container.appendChild(div);
     });
-
-    document.getElementById("coinTotal").innerText =
-        totalCoins.toLocaleString();
-}
-
-/* ---------- COINS ---------- */
-function addCoins(){
-    let val = parseInt(document.getElementById("manualCoins").value);
-    if(!val) return;
-
-    totalCoins += val;
-
-    document.getElementById("coinTotal").innerText =
-        totalCoins.toLocaleString();
 }
 
 /* ---------- ACTIONS ---------- */
@@ -198,19 +166,18 @@ async function add(){
     if(!name || !min) return;
 
     let p = data[name] || {
-        name:name,
-        time:0,
-        running:false,
-        last_update:new Date().toISOString()
+        name,
+        time: 0,
+        running: false,
+        last_update: new Date().toISOString()
     };
 
     updateTime(p);
 
-    p.time += min*60;
+    p.time += min * 60;
     p.running = true;
     p.last_update = new Date().toISOString();
 
-    data[name] = p;
     await save(p);
 }
 
@@ -222,7 +189,7 @@ async function addTime(name){
 
     updateTime(p);
 
-    p.time += val*60;
+    p.time += val * 60;
     p.running = true;
     p.last_update = new Date().toISOString();
 
@@ -243,11 +210,6 @@ async function resume(name){
     await save(p);
 }
 
-async function delPlayer(name){
-    await db.from("timers").delete().eq("name", name);
-    delete data[name];
-}
-
 /* ---------- GLOBAL ---------- */
 
 async function addAll(){
@@ -259,7 +221,7 @@ async function addAll(){
 
         updateTime(p);
 
-        p.time += min*60;
+        p.time += min * 60;
         p.running = true;
         p.last_update = new Date().toISOString();
 
@@ -288,7 +250,19 @@ async function resumeAll(){
 async function clearAll(){
     await db.from("timers").delete().neq("name","");
     data = {};
-    totalCoins = 0;
+}
+
+/* ---------- REALTIME SYNC ---------- */
+
+function subscribe(){
+    db.channel('timers-changes')
+    .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'timers' },
+        payload => {
+            load().then(render);
+        }
+    )
+    .subscribe();
 }
 
 /* ---------- INIT ---------- */
@@ -299,14 +273,14 @@ document.getElementById("pauseAll").onclick = pauseAll;
 document.getElementById("resumeAll").onclick = resumeAll;
 document.getElementById("clearAll").onclick = clearAll;
 
-init();
-
 async function init(){
     await load();
     render();
+    subscribe();
 }
 
-setInterval(render,1000);
+init();
+setInterval(render, 1000);
 
 </script>
 
