@@ -2,64 +2,114 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<title>EXP Lineage2</title>
+<title>L2 EXP System</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body { font-family: Arial; background:#1a1a2e; color:#fff; }
-.top { text-align:center; }
-
-input, button {
-    padding:6px;
-    margin:3px;
-    border-radius:6px;
-    border:none;
+body {
+    margin:0;
+    font-family: 'Georgia', serif;
+    background: url('https://i.imgur.com/3ZQ3ZQm.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color:#f5e6c8;
+    cursor: url('https://cur.cursors-4u.net/games/gam-10/gam969.cur'), auto;
 }
 
-button { cursor:pointer; font-weight:bold; }
+/* dark overlay */
+body::before {
+    content:"";
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.75);
+    z-index:-1;
+}
 
-#addBtn { background:#e74c3c; color:white; }
-#addAllBtn { background:#9b59b6; color:white; }
-.global { background:#34495e; color:white; }
+h1 {
+    text-align:center;
+    color:#d4af37;
+    text-shadow:0 0 10px black;
+    margin-top:20px;
+}
+
+.top {
+    text-align:center;
+    margin-bottom:20px;
+}
+
+input {
+    padding:8px;
+    margin:4px;
+    border:1px solid #d4af37;
+    background:#111;
+    color:#fff;
+}
+
+button {
+    padding:8px 10px;
+    margin:3px;
+    border:none;
+    cursor:pointer;
+    font-weight:bold;
+    background:#2b1b0f;
+    color:#f5e6c8;
+    border:1px solid #d4af37;
+}
+
+button:hover {
+    background:#3a2415;
+}
 
 .players {
-    padding:20px;
-    max-width:700px;
+    max-width:800px;
+    margin:auto;
+    padding:10px;
 }
 
 .player {
     display:flex;
     align-items:center;
-    gap:10px;
-    padding:8px;
-    border-bottom:1px solid rgba(255,255,255,0.2);
+    justify-content:space-between;
+    padding:10px;
+    margin:5px 0;
+    background:rgba(0,0,0,0.6);
+    border:1px solid #d4af37;
 }
 
-.warning { background:rgba(255,165,0,0.3); }
-.danger { background:rgba(255,0,0,0.4); }
+.player span {
+    margin:0 5px;
+}
+
+.warning { border-color:orange; }
+.danger { border-color:red; }
+
+.icon {
+    margin-right:5px;
+}
 </style>
 </head>
 
 <body>
 
+<h1>⚔ L2 EXP CONTROL PANEL ⚔</h1>
+
 <div class="top">
-    <h1>EXP Lineage2</h1>
 
-    <input id="name" placeholder="Имя">
-    <input id="minutes" type="number" placeholder="Мин">
-    <button id="addBtn">Добавить</button>
+<input id="name" placeholder="Имя персонажа">
+<input id="minutes" type="number" placeholder="Минуты">
+<button onclick="add()">➕ Добавить</button>
 
-    <br>
+<br>
 
-    <input id="allMinutes" type="number" placeholder="+мин всем">
-    <button id="addAllBtn">Добавить всем</button>
+<input id="allMinutes" type="number" placeholder="+ всем">
+<button onclick="addAll()">⚡ Всем</button>
 
-    <br>
+<br>
 
-    <button id="pauseAll" class="global">⏸ Остановить всех</button>
-    <button id="resumeAll" class="global">▶ Запустить всех</button>
-    <button id="clearAll" class="global">🧹 Очистить всех</button>
+<button onclick="pauseAll()">⏸ Стоп всех</button>
+<button onclick="resumeAll()">▶ Старт всех</button>
+<button onclick="clearAll()">🧹 Очистить</button>
+
 </div>
 
 <div id="players" class="players"></div>
@@ -72,6 +122,33 @@ const SUPABASE_KEY = "YOUR_ANON_KEY";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let data = {};
+
+/* ---------- FIXED SAVE (MAIN BUG FIX) ---------- */
+async function save(p){
+    const { error } = await db
+        .from("timers")
+        .upsert(p, { onConflict: "name" });
+
+    if(error){
+        console.log("SUPABASE ERROR:", error.message);
+    }
+}
+
+/* ---------- LOAD ---------- */
+async function load(){
+    const { data:rows, error } = await db
+        .from("timers")
+        .select("*");
+
+    if(error){
+        console.log(error.message);
+        return;
+    }
+
+    let obj = {};
+    rows.forEach(p => obj[p.name] = p);
+    data = obj;
+}
 
 /* ---------- TIME ---------- */
 function updateTime(p){
@@ -91,29 +168,6 @@ function updateTime(p){
     }
 }
 
-/* ---------- LOAD ---------- */
-async function load(){
-    let {data:rows} = await db.from("timers").select("*");
-
-    let obj = {};
-
-    rows.forEach(p=>{
-        obj[p.name] = p;
-    });
-
-    data = obj;
-}
-
-/* ---------- SAVE ---------- */
-async function save(p){
-    await db.from("timers").upsert(p);
-}
-
-/* ---------- DELETE ---------- */
-async function delPlayer(name){
-    await db.from("timers").delete().eq("name", name);
-}
-
 /* ---------- FORMAT ---------- */
 function format(s){
     let m = Math.floor(s/60);
@@ -123,38 +177,36 @@ function format(s){
 
 /* ---------- RENDER ---------- */
 function render(){
-    const container = document.getElementById("players");
-    container.innerHTML = "";
+    const el = document.getElementById("players");
+    el.innerHTML = "";
 
-    Object.values(data).forEach(p=>{
-        updateTime(p);
-    });
+    Object.values(data).forEach(updateTime);
 
-    let arr = Object.values(data).sort((a,b)=> a.time - b.time);
+    let arr = Object.values(data).sort((a,b)=>a.time-b.time);
 
-    arr.forEach((p, index)=>{
+    arr.forEach((p,i)=>{
 
-        const div = document.createElement("div");
+        let div = document.createElement("div");
         div.className = "player";
 
-        if(p.time <= 300 && p.time > 60) div.classList.add("warning");
-        if(p.time <= 60 && p.time > 0) div.classList.add("danger");
+        if(p.time < 300) div.classList.add("warning");
+        if(p.time < 60) div.classList.add("danger");
 
         div.innerHTML = `
-            <span style="width:30px;">${index+1}.</span>
-            <span style="width:120px;"><b>${p.name}</b></span>
-            <span style="width:80px;">${format(p.time)}</span>
+            <span>⚔ ${i+1}</span>
+            <span><b>${p.name}</b></span>
+            <span>⏳ ${format(p.time)}</span>
 
             <button onclick="pause('${p.name}')">⏸</button>
             <button onclick="resume('${p.name}')">▶</button>
 
-            <input type="number" id="add_${p.name}" placeholder="+мин" style="width:60px;">
-            <button onclick="addTime('${p.name}')">+</button>
+            <input id="add_${p.name}" style="width:60px" placeholder="+мин">
+            <button onclick="addTime('${p.name}')">➕</button>
 
-            <button onclick="delPlayer('${p.name}')">❌</button>
+            <button onclick="del('${p.name}')">❌</button>
         `;
 
-        container.appendChild(div);
+        el.appendChild(div);
     });
 }
 
@@ -163,20 +215,23 @@ function render(){
 async function add(){
     let name = document.getElementById("name").value.trim();
     let min = parseInt(document.getElementById("minutes").value);
+
     if(!name || !min) return;
 
     let p = data[name] || {
         name,
-        time: 0,
-        running: false,
-        last_update: new Date().toISOString()
+        time:0,
+        running:false,
+        last_update:new Date().toISOString()
     };
 
     updateTime(p);
 
-    p.time += min * 60;
+    p.time += min*60;
     p.running = true;
     p.last_update = new Date().toISOString();
+
+    data[name] = p;
 
     await save(p);
 }
@@ -189,7 +244,7 @@ async function addTime(name){
 
     updateTime(p);
 
-    p.time += val * 60;
+    p.time += val*60;
     p.running = true;
     p.last_update = new Date().toISOString();
 
@@ -210,18 +265,23 @@ async function resume(name){
     await save(p);
 }
 
+async function del(name){
+    await db.from("timers").delete().eq("name", name);
+    delete data[name];
+}
+
 /* ---------- GLOBAL ---------- */
 
 async function addAll(){
     let min = parseInt(document.getElementById("allMinutes").value);
     if(!min) return;
 
-    for(let name in data){
-        let p = data[name];
+    for(let n in data){
+        let p = data[n];
 
         updateTime(p);
 
-        p.time += min * 60;
+        p.time += min*60;
         p.running = true;
         p.last_update = new Date().toISOString();
 
@@ -230,8 +290,8 @@ async function addAll(){
 }
 
 async function pauseAll(){
-    for(let name in data){
-        let p = data[name];
+    for(let n in data){
+        let p = data[n];
         updateTime(p);
         p.running = false;
         await save(p);
@@ -239,8 +299,8 @@ async function pauseAll(){
 }
 
 async function resumeAll(){
-    for(let name in data){
-        let p = data[name];
+    for(let n in data){
+        let p = data[n];
         p.running = true;
         p.last_update = new Date().toISOString();
         await save(p);
@@ -252,26 +312,17 @@ async function clearAll(){
     data = {};
 }
 
-/* ---------- REALTIME SYNC ---------- */
-
+/* ---------- REALTIME FIX ---------- */
 function subscribe(){
-    db.channel('timers-changes')
-    .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'timers' },
-        payload => {
-            load().then(render);
-        }
+    db.channel("l2-live")
+    .on("postgres_changes",
+        { event:"*", schema:"public", table:"timers" },
+        () => load().then(render)
     )
     .subscribe();
 }
 
 /* ---------- INIT ---------- */
-
-document.getElementById("addBtn").onclick = add;
-document.getElementById("addAllBtn").onclick = addAll;
-document.getElementById("pauseAll").onclick = pauseAll;
-document.getElementById("resumeAll").onclick = resumeAll;
-document.getElementById("clearAll").onclick = clearAll;
 
 async function init(){
     await load();
