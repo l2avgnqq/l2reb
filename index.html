@@ -104,11 +104,23 @@ let soundEnabled=false;
 
 /* ================= SOUND FIX (PC SAFE) ================= */
 
+let soundEnabled=false;
+
 function unlockSound(){
 const a=document.getElementById("alarm");
 a.play().then(()=>a.pause()).catch(()=>{});
 soundEnabled=true;
-document.getElementById("soundBtn").innerText="🔊 Звук ON";
+updateSoundUI();
+}
+
+function toggleSound(){
+soundEnabled=!soundEnabled;
+updateSoundUI();
+}
+
+function updateSoundUI(){
+const btn=document.getElementById("soundBtn");
+btn.innerText=soundEnabled ? "🔊" : "🔇";
 }
 
 function playSound(){
