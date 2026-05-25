@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2</title>
+<title>EXP L2 FIX</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -62,6 +62,7 @@ font-weight:bold;
 }
 
 .actions{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+
 </style>
 </head>
 
@@ -115,13 +116,6 @@ document.getElementById("soundBtn").innerText =
 soundOn ? "🔊 Звук ВКЛ" : "🔇 Звук ВЫКЛ";
 }
 
-function playSound(){
-if(!soundOn) return;
-const a=document.getElementById("alarm");
-a.currentTime=0;
-a.play().catch(()=>{});
-}
-
 /* TIME */
 
 function fmt(s){
@@ -142,45 +136,34 @@ return Math.max(0,p.time-diff);
 
 async function load(){
 const {data}=await db.from("timers").select("*");
-players={};
-(data||[]).forEach(p=>players[p.name]=p);
-draw();
+
+let newData={};
+(data||[]).forEach(p=>newData[p.name]=p);
+
+/* добавляем новых */
+for(let name in newData){
+if(!players[name]){
+createRow(newData[name]);
+}
 }
 
-/* DRAW */
+players=newData;
+}
 
-function draw(){
-const list=document.getElementById("list");
-list.innerHTML="";
+/* CREATE ROW ONCE */
 
-Object.values(players)
-.sort((a,b)=>remaining(a)-remaining(b))
-.forEach((p,i)=>{
+function createRow(p){
 
-let t=remaining(p);
+if(document.getElementById("row_"+p.name)) return;
 
 let div=document.createElement("div");
 div.className="player";
-
-if(t<=300) div.classList.add("warn");
-if(t<=60) div.classList.add("danger");
-if(t<=30) div.classList.add("flash");
-
-if(t<=0 && p.running){
-p.running=false;
-p.time=0;
-save(p);
-
-if(!fired[p.name]){
-fired[p.name]=true;
-playSound();
-}
-}
+div.id="row_"+p.name;
 
 div.innerHTML=`
-<div class="idx">${i+1}</div>
+<div class="idx">0</div>
 <div class="name">${p.name}</div>
-<div class="time">${fmt(t)}</div>
+<div class="time" id="t_${p.name}">0</div>
 
 <div class="actions">
 
@@ -197,8 +180,59 @@ p.running
 </div>
 `;
 
-list.appendChild(div);
+document.getElementById("list").appendChild(div);
+}
+
+/* UPDATE ONLY TIME (NO RESET UI) */
+
+function tick(){
+
+let arr=Object.values(players)
+.sort((a,b)=>remaining(a)-remaining(b));
+
+arr.forEach((p,i)=>{
+
+createRow(p);
+
+let t=remaining(p);
+
+let el=document.getElementById("t_"+p.name);
+if(el) el.innerText=fmt(t);
+
+let row=document.getElementById("row_"+p.name);
+if(row){
+
+row.querySelector(".idx").innerText=i+1;
+
+row.classList.remove("warn","danger","flash");
+
+if(t<=300) row.classList.add("warn");
+if(t<=60) row.classList.add("danger");
+if(t<=30) row.classList.add("flash");
+
+}
+
+if(t<=0 && p.running){
+p.running=false;
+p.time=0;
+save(p);
+
+if(!fired[p.name]){
+fired[p.name]=true;
+playSound();
+}
+}
+
 });
+}
+
+/* SOUND */
+
+function playSound(){
+if(!soundOn) return;
+const a=document.getElementById("alarm");
+a.currentTime=0;
+a.play().catch(()=>{});
 }
 
 /* SAVE */
@@ -210,8 +244,8 @@ await db.from("timers").upsert(p);
 /* ACTIONS */
 
 async function addPlayer(){
-const name=document.getElementById("name").value.trim();
-const min=parseInt(document.getElementById("min").value,10);
+let name=document.getElementById("name").value.trim();
+let min=parseInt(document.getElementById("min").value,10);
 if(!name||!min) return;
 
 let p=players[name]||{name,time:0,running:false,last_update:null};
@@ -220,23 +254,21 @@ p.time=remaining(p)+min*60;
 p.running=true;
 p.last_update=new Date().toISOString();
 
-fired[name]=false;
-
 await save(p);
-await load(); // <-- ВАЖНО FIX
+await load();
 }
 
-async function addAll(){
-const min=parseInt(document.getElementById("all").value,10);
-if(!min) return;
+async function addTime(name){
+let v=parseInt(document.getElementById("i_"+name).value,10);
+if(!v) return;
 
-for(let p of Object.values(players)){
-p.time=remaining(p)+min*60;
+let p=players[name];
+
+p.time=remaining(p)+v*60;
 p.running=true;
 p.last_update=new Date().toISOString();
-await save(p);
-}
 
+await save(p);
 await load();
 }
 
@@ -260,10 +292,24 @@ await load();
 async function del(name){
 await db.from("timers").delete().eq("name",name);
 delete players[name];
-draw();
+document.getElementById("row_"+name)?.remove();
 }
 
 /* GLOBAL */
+
+async function addAll(){
+let min=parseInt(document.getElementById("all").value,10);
+if(!min) return;
+
+for(let p of Object.values(players)){
+p.time=remaining(p)+min*60;
+p.running=true;
+p.last_update=new Date().toISOString();
+await save(p);
+}
+
+await load();
+}
 
 async function pauseAll(){
 for(let p of Object.values(players)){
@@ -271,6 +317,7 @@ p.time=remaining(p);
 p.running=false;
 await save(p);
 }
+
 await load();
 }
 
@@ -281,20 +328,22 @@ p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
 }
+
 await load();
 }
 
 async function clearAll(){
 await db.from("timers").delete().gt("time",-1);
 players={};
-draw();
+document.getElementById("list").innerHTML="";
 }
 
 /* INIT */
 
 async function init(){
 await load();
-setInterval(draw,1000);
+setInterval(tick,1000);      // time update
+setInterval(load,3500);      // server sync (как ты просил 3–4 сек)
 }
 
 init();
