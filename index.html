@@ -2,53 +2,22 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>EXP Lineage2</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-
 body{
     margin:0;
-    padding:0;
     background:#111827;
-    color:white;
-    font-family:Arial;
+    color:#fff;
+    font-family:Arial,sans-serif;
 }
 
 .top{
     text-align:center;
     padding:20px;
-}
-
-h1{
-    margin-bottom:20px;
-}
-
-input,button{
-    padding:10px 14px;
-    border:none;
-    border-radius:10px;
-    margin:4px;
-    font-size:14px;
-}
-
-input{
-    background:#1f2937;
-    color:white;
-}
-
-button{
-    cursor:pointer;
-    font-weight:bold;
-    transition:0.15s;
-}
-
-button:hover{
-    opacity:0.92;
-    transform:scale(1.03);
 }
 
 .players{
@@ -58,28 +27,22 @@ button:hover{
 }
 
 .player{
-
-    background:#1e293b;
-
+    background:#1f2937;
     border-radius:14px;
-
     padding:14px;
-
     margin-bottom:10px;
-
     display:flex;
     align-items:center;
-    gap:12px;
-
+    gap:10px;
     flex-wrap:wrap;
 }
 
 .warning{
-    background:#5a3b00;
+    background:#5c3b00;
 }
 
 .danger{
-    background:#5a0000;
+    background:#5c0000;
 }
 
 .playerIndex{
@@ -90,7 +53,6 @@ button:hover{
 .playerName{
     width:180px;
     font-weight:bold;
-    overflow:hidden;
 }
 
 .playerTime{
@@ -100,37 +62,60 @@ button:hover{
     font-weight:bold;
 }
 
+input,button{
+    border:none;
+    border-radius:10px;
+    padding:10px 14px;
+    margin:4px;
+    font-size:14px;
+}
+
+input{
+    background:#374151;
+    color:#fff;
+}
+
+button{
+    cursor:pointer;
+    font-weight:bold;
+    transition:.15s;
+}
+
+button:hover{
+    transform:scale(1.03);
+    opacity:.92;
+}
+
 .smallInput{
     width:70px;
 }
 
 .pauseBtn{
     background:#f39c12;
-    color:white;
+    color:#fff;
 }
 
 .resumeBtn{
     background:#2ecc71;
-    color:white;
-}
-
-.deleteBtn{
-    background:#e74c3c;
-    color:white;
+    color:#fff;
 }
 
 .addBtn{
     background:#3498db;
-    color:white;
+    color:#fff;
+}
+
+.deleteBtn{
+    background:#e74c3c;
+    color:#fff;
 }
 
 .global{
     background:#6b7280;
-    color:white;
+    color:#fff;
 }
 
 @media(max-width:768px){
-
     .player{
         flex-direction:column;
         align-items:flex-start;
@@ -140,9 +125,7 @@ button:hover{
     .playerTime{
         width:100%;
     }
-
 }
-
 </style>
 </head>
 
@@ -154,39 +137,31 @@ button:hover{
 
 <input id="name" placeholder="Имя">
 
-<input
-    id="minutes"
-    type="number"
-    placeholder="Минуты"
->
+<input id="minutes" type="number" placeholder="Минуты">
 
-<button onclick="addPlayer()" class="addBtn">
+<button class="addBtn" onclick="addPlayer()">
 Добавить
 </button>
 
 <br>
 
-<input
-    id="allMinutes"
-    type="number"
-    placeholder="+ всем минут"
->
+<input id="allMinutes" type="number" placeholder="+ всем минут">
 
-<button onclick="addAll()" class="addBtn">
+<button class="addBtn" onclick="addAll()">
 Добавить всем
 </button>
 
 <br><br>
 
-<button onclick="pauseAll()" class="global">
+<button class="global" onclick="pauseAll()">
 Пауза всем
 </button>
 
-<button onclick="resumeAll()" class="global">
+<button class="global" onclick="resumeAll()">
 Старт всем
 </button>
 
-<button onclick="clearAll()" class="global">
+<button class="global" onclick="clearAll()">
 Очистить
 </button>
 
@@ -200,58 +175,36 @@ button:hover{
 
 <script>
 
-/* =========================
-   SUPABASE
-========================= */
+const SUPABASE_URL="https://mxwtlfkhykqegzytotlq.supabase.co";
 
-const SUPABASE_URL =
-"https://mxwtlfkhykqegzytotlq.supabase.co";
+const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 
-const SUPABASE_KEY =
-"sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
-
-const db = supabase.createClient(
+const db=supabase.createClient(
     SUPABASE_URL,
     SUPABASE_KEY
 );
 
-/* =========================
-   DATA
-========================= */
+let players={};
 
-let players = {};
-
-let notified = {};
-
-/* =========================
-   FORMAT TIME
-========================= */
+let notified={};
 
 function formatTime(sec){
 
-    sec = Math.max(0, sec);
+    sec=Math.max(0,sec);
 
-    const h = Math.floor(sec / 3600);
+    const h=Math.floor(sec/3600);
 
-    const m = Math.floor((sec % 3600) / 60);
+    const m=Math.floor((sec%3600)/60);
 
-    const s = sec % 60;
+    const s=sec%60;
 
-    return [
-
+    return[
         h,
-
         String(m).padStart(2,"0"),
-
         String(s).padStart(2,"0")
-
     ].join(":");
 
 }
-
-/* =========================
-   GET REMAINING
-========================= */
 
 function getRemaining(p){
 
@@ -261,29 +214,25 @@ function getRemaining(p){
 
     }
 
-    const passed = Math.floor(
+    const passed=Math.floor(
 
-        (Date.now() -
-        new Date(p.started_at)) / 1000
+        (Date.now()-
+        new Date(p.started_at))/1000
 
     );
 
     return Math.max(
         0,
-        p.duration - passed
+        p.duration-passed
     );
 
 }
 
-/* =========================
-   LOAD
-========================= */
-
 async function loadPlayers(){
 
-    const { data, error } = await db
-        .from("timers")
-        .select("*");
+    const {data,error}=await db
+    .from("timers")
+    .select("*");
 
     if(error){
 
@@ -293,25 +242,21 @@ async function loadPlayers(){
 
     }
 
-    players = {};
+    players={};
 
-    (data || []).forEach(p=>{
+    (data||[]).forEach(p=>{
 
-        players[p.name] = p;
+        players[p.name]=p;
 
     });
 
 }
 
-/* =========================
-   SAVE
-========================= */
-
 async function savePlayer(p){
 
-    const { error } = await db
-        .from("timers")
-        .upsert(p);
+    const {error}=await db
+    .from("timers")
+    .upsert(p);
 
     if(error){
 
@@ -321,29 +266,25 @@ async function savePlayer(p){
 
 }
 
-/* =========================
-   NOTIFICATION
-========================= */
-
 function playAlarm(name){
 
     try{
 
-        const audio =
+        const audio=
         document.getElementById("alarm");
 
-        audio.currentTime = 0;
+        audio.currentTime=0;
 
         audio.play();
 
     }catch(e){}
 
-    document.title =
-    "⏰ EXP закончился: " + name;
+    document.title=
+    "⏰ EXP закончилось: "+name;
 
     if("Notification" in window){
 
-        if(Notification.permission === "granted"){
+        if(Notification.permission==="granted"){
 
             new Notification(
                 "EXP закончилось",
@@ -358,42 +299,38 @@ function playAlarm(name){
 
 }
 
-/* =========================
-   RENDER
-========================= */
-
 function render(){
 
-    const container =
+    const container=
     document.getElementById("players");
 
-    container.innerHTML = "";
+    container.innerHTML="";
 
-    const arr = Object.values(players)
+    const arr=Object.values(players)
 
     .sort((a,b)=>
 
-        getRemaining(a) -
+        getRemaining(a)-
         getRemaining(b)
 
     );
 
     arr.forEach((p,index)=>{
 
-        const remain =
+        const remain=
         getRemaining(p);
 
-        if(remain <= 0 && p.running){
+        if(remain<=0 && p.running){
 
-            p.running = false;
+            p.running=false;
 
-            p.duration = 0;
+            p.duration=0;
 
             savePlayer(p);
 
             if(!notified[p.name]){
 
-                notified[p.name] = true;
+                notified[p.name]=true;
 
                 playAlarm(p.name);
 
@@ -401,48 +338,27 @@ function render(){
 
         }
 
-        const div =
+        const div=
         document.createElement("div");
 
-        div.className = "player";
+        div.className="player";
 
-        if(remain <= 300 && remain > 60){
+        if(remain<=300 && remain>60){
 
             div.classList.add("warning");
 
         }
 
-        if(remain <= 60){
+        if(remain<=60){
 
             div.classList.add("danger");
 
         }
 
-        const controls = p.running
+        const safeName=
+        encodeURIComponent(p.name);
 
-        ?
-
-        `
-        <button
-            class="pauseBtn"
-            onclick="pausePlayer('${p.name}')"
-        >
-            Пауза
-        </button>
-        `
-
-        :
-
-        `
-        <button
-            class="resumeBtn"
-            onclick="resumePlayer('${p.name}')"
-        >
-            Старт
-        </button>
-        `;
-
-        div.innerHTML = `
+        div.innerHTML=`
 
         <div class="playerIndex">
             ${index+1}
@@ -456,25 +372,49 @@ function render(){
             ${formatTime(remain)}
         </div>
 
-        ${controls}
+        ${
+            p.running
+
+            ?
+
+            `
+            <button
+                class="pauseBtn"
+                onclick="pausePlayer('${safeName}')"
+            >
+                Пауза
+            </button>
+            `
+
+            :
+
+            `
+            <button
+                class="resumeBtn"
+                onclick="resumePlayer('${safeName}')"
+            >
+                Старт
+            </button>
+            `
+        }
 
         <input
             type="number"
-            id="add_${p.name}"
+            id="add_${safeName}"
             class="smallInput"
             placeholder="мин"
         >
 
         <button
             class="addBtn"
-            onclick="addTime('${p.name}')"
+            onclick="addTime('${safeName}')"
         >
             Добавить
         </button>
 
         <button
             class="deleteBtn"
-            onclick="deletePlayer('${p.name}')"
+            onclick="deletePlayer('${safeName}')"
         >
             Удалить
         </button>
@@ -487,18 +427,15 @@ function render(){
 
 }
 
-/* =========================
-   ADD PLAYER
-========================= */
-
 async function addPlayer(){
 
-    const name = document
-        .getElementById("name")
-        .value
-        .trim();
+    const name=
+    document
+    .getElementById("name")
+    .value
+    .trim();
 
-    const min = parseInt(
+    const min=parseInt(
 
         document
         .getElementById("minutes")
@@ -516,11 +453,11 @@ async function addPlayer(){
 
     }
 
-    let p = players[name];
+    let p=players[name];
 
     if(!p){
 
-        p = {
+        p={
 
             name,
 
@@ -534,33 +471,33 @@ async function addPlayer(){
 
     }
 
-    const remain =
+    const remain=
     getRemaining(p);
 
-    p.duration =
-    remain + min * 60;
+    p.duration=
+    remain+min*60;
 
-    p.running = true;
+    p.running=true;
 
-    p.started_at =
+    p.started_at=
     new Date().toISOString();
 
-    notified[name] = false;
+    notified[name]=false;
 
     await savePlayer(p);
 
 }
 
-/* =========================
-   ADD TIME
-========================= */
-
 async function addTime(name){
 
-    const val = parseInt(
+    name=decodeURIComponent(name);
+
+    const val=parseInt(
 
         document
-        .getElementById("add_"+name)
+        .getElementById(
+            "add_"+encodeURIComponent(name)
+        )
         .value,
 
         10
@@ -573,85 +510,75 @@ async function addTime(name){
 
     }
 
-    const p = players[name];
+    const p=players[name];
 
-    const remain =
+    const remain=
     getRemaining(p);
 
-    p.duration =
-    remain + val * 60;
+    p.duration=
+    remain+val*60;
 
-    p.running = true;
+    p.running=true;
 
-    p.started_at =
+    p.started_at=
     new Date().toISOString();
 
-    notified[name] = false;
+    notified[name]=false;
 
     await savePlayer(p);
 
 }
-
-/* =========================
-   PAUSE
-========================= */
 
 async function pausePlayer(name){
 
-    const p = players[name];
+    name=decodeURIComponent(name);
 
-    p.duration =
+    const p=players[name];
+
+    p.duration=
     getRemaining(p);
 
-    p.running = false;
+    p.running=false;
 
     await savePlayer(p);
 
 }
 
-/* =========================
-   RESUME
-========================= */
-
 async function resumePlayer(name){
 
-    const p = players[name];
+    name=decodeURIComponent(name);
 
-    if(p.duration <= 0){
+    const p=players[name];
+
+    if(p.duration<=0){
 
         return;
 
     }
 
-    p.running = true;
+    p.running=true;
 
-    p.started_at =
+    p.started_at=
     new Date().toISOString();
 
     await savePlayer(p);
 
 }
 
-/* =========================
-   DELETE
-========================= */
-
 async function deletePlayer(name){
 
+    name=decodeURIComponent(name);
+
     await db
-        .from("timers")
-        .delete()
-        .eq("name", name);
+    .from("timers")
+    .delete()
+    .eq("name",name);
 
 }
 
-/* =========================
-   GLOBAL
-========================= */
-
 async function addAll(){
 
-    const min = parseInt(
+    const min=parseInt(
 
         document
         .getElementById("allMinutes")
@@ -672,15 +599,15 @@ async function addAll(){
         Object.values(players)
         .map(async p=>{
 
-            const remain =
+            const remain=
             getRemaining(p);
 
-            p.duration =
-            remain + min * 60;
+            p.duration=
+            remain+min*60;
 
-            p.running = true;
+            p.running=true;
 
-            p.started_at =
+            p.started_at=
             new Date().toISOString();
 
             return savePlayer(p);
@@ -698,10 +625,10 @@ async function pauseAll(){
         Object.values(players)
         .map(async p=>{
 
-            p.duration =
+            p.duration=
             getRemaining(p);
 
-            p.running = false;
+            p.running=false;
 
             return savePlayer(p);
 
@@ -718,15 +645,15 @@ async function resumeAll(){
         Object.values(players)
         .map(async p=>{
 
-            if(p.duration <= 0){
+            if(p.duration<=0){
 
                 return;
 
             }
 
-            p.running = true;
+            p.running=true;
 
-            p.started_at =
+            p.started_at=
             new Date().toISOString();
 
             return savePlayer(p);
@@ -740,15 +667,11 @@ async function resumeAll(){
 async function clearAll(){
 
     await db
-        .from("timers")
-        .delete()
-        .gt("duration",-1);
+    .from("timers")
+    .delete()
+    .gt("duration",-1);
 
 }
-
-/* =========================
-   INIT
-========================= */
 
 async function init(){
 
@@ -766,15 +689,10 @@ async function init(){
 
 init();
 
-/* =========================
-   REALTIME
-========================= */
-
 db.channel("timers")
 
 .on(
     "postgres_changes",
-
     {
         event:"*",
         schema:"public",
@@ -788,16 +706,11 @@ db.channel("timers")
         render();
 
     }
-
 )
 
 .subscribe();
 
-/* =========================
-   LIVE TIMER
-========================= */
-
-setInterval(render, 1000);
+setInterval(render,1000);
 
 </script>
 
