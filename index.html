@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2 STABLE INPUT FIX</title>
+<title>EXP L2 FINAL</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
 body{margin:0;background:#0b1220;color:#fff;font-family:Arial}
 .top{text-align:center;padding:20px}
+
 .players{max-width:1000px;margin:auto;padding:10px}
 
 .player{
@@ -48,6 +49,7 @@ font-weight:bold;
 .resume{background:#22c55e}
 .del{background:#ef4444}
 .global{background:#334155;color:#fff}
+.soundBtn{background:#6366f1;color:#fff}
 
 .warn{background:#2a1f00}
 .danger{background:#3a0a0a}
@@ -60,7 +62,11 @@ font-weight:bold;
 
 <div class="top">
 
-<h2>EXP L2 STABLE</h2>
+<h2>EXP L2 TIMER</h2>
+
+<button id="soundBtn" class="soundBtn" onclick="toggleSound()">🔇</button>
+
+<br><br>
 
 <input id="name" placeholder="Имя">
 <input id="min" type="number" placeholder="Мин">
@@ -81,7 +87,9 @@ font-weight:bold;
 
 <div id="list" class="players"></div>
 
-<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+<audio id="alarm" preload="auto">
+<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
+</audio>
 
 <script>
 
@@ -91,7 +99,33 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
+let soundOn=false;
+let soundUnlocked=false;
 let fired={};
+
+/* ================= SOUND ================= */
+
+function toggleSound(){
+soundOn=!soundOn;
+document.getElementById("soundBtn").innerText=soundOn?"🔊":"🔇";
+
+/* unlock audio (required for Chrome/Android) */
+if(!soundUnlocked){
+const a=document.getElementById("alarm");
+a.play().then(()=>{
+a.pause();
+a.currentTime=0;
+soundUnlocked=true;
+}).catch(()=>{});
+}
+}
+
+function playSound(){
+if(!soundOn || !soundUnlocked) return;
+const a=document.getElementById("alarm");
+a.currentTime=0;
+a.play().catch(()=>{});
+}
 
 /* ================= TIME ================= */
 
@@ -113,23 +147,33 @@ return Math.max(0,p.time-diff);
 
 async function load(){
 const {data}=await db.from("timers").select("*");
-
 players={};
 (data||[]).forEach(p=>players[p.name]=p);
 }
 
-/* ================= CREATE ONCE ================= */
+/* ================= RENDER ================= */
 
-function createRow(p){
+function render(){
 
-let div=document.createElement("div");
-div.className="player";
-div.id="row_"+p.name;
+let arr=Object.values(players)
+.map(p=>({...p,r:remaining(p)}))
+.sort((a,b)=>a.r-b.r);
 
-div.innerHTML=`
-<div class="idx">0</div>
+const list=document.getElementById("list");
+list.innerHTML="";
+
+arr.forEach((p,i)=>{
+
+let row=document.createElement("div");
+row.className="player";
+
+if(p.r<=300) row.classList.add("warn");
+if(p.r<=60) row.classList.add("danger");
+
+row.innerHTML=`
+<div class="idx">${i+1}</div>
 <div class="name">${p.name}</div>
-<div class="time" id="t_${p.name}">0</div>
+<div class="time">${fmt(p.r)}</div>
 
 <div class="actions">
 
@@ -146,43 +190,19 @@ p.running
 </div>
 `;
 
-document.getElementById("list").appendChild(div);
+list.appendChild(row);
+
+/* SOUND TRIGGER */
+if(p.r<=0 && p.running){
+p.running=false;
+p.time=0;
+save(p);
+
+if(!fired[p.name]){
+fired[p.name]=true;
+playSound();
 }
-
-/* ================= ENSURE ================= */
-
-function ensureRows(){
-for(let p of Object.values(players)){
-if(!document.getElementById("row_"+p.name)){
-createRow(p);
 }
-}
-}
-
-/* ================= UPDATE ONLY TEXT ================= */
-
-function updateUI(){
-
-let arr=Object.values(players)
-.map(p=>({...p,r:remaining(p)}))
-.sort((a,b)=>a.r-b.r);
-
-arr.forEach((p,i)=>{
-
-let row=document.getElementById("row_"+p.name);
-if(!row) return;
-
-/* index */
-row.querySelector(".idx").innerText=i+1;
-
-/* ONLY TIME UPDATE (NO INPUT TOUCH!) */
-let t=document.getElementById("t_"+p.name);
-if(t) t.innerText=fmt(p.r);
-
-/* colors */
-row.classList.remove("warn","danger");
-if(p.r<=300) row.classList.add("warn");
-if(p.r<=60) row.classList.add("danger");
 
 });
 
@@ -211,8 +231,7 @@ fired[name]=false;
 
 await save(p);
 await load();
-ensureRows();
-renderAll();
+render();
 }
 
 async function addTime(name){
@@ -227,7 +246,7 @@ p.last_update=new Date().toISOString();
 
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function pause(name){
@@ -236,7 +255,7 @@ p.time=remaining(p);
 p.running=false;
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function resume(name){
@@ -246,44 +265,77 @@ p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function del(name){
 await db.from("timers").delete().eq("name",name);
 delete players[name];
 await load();
-renderAll();
+render();
+}
+
+/* ================= GLOBAL ================= */
+
+async function addAll(){
+let min=parseInt(document.getElementById("all").value,10);
+if(!min) return;
+
+for(let p of Object.values(players)){
+p.time=remaining(p)+min*60;
+p.running=true;
+p.last_update=new Date().toISOString();
+await save(p);
+}
+
+await load();
+render();
+}
+
+async function pauseAll(){
+for(let p of Object.values(players)){
+p.time=remaining(p);
+p.running=false;
+await save(p);
+}
+
+await load();
+render();
+}
+
+async function resumeAll(){
+for(let p of Object.values(players)){
+if(p.time<=0) continue;
+p.running=true;
+p.last_update=new Date().toISOString();
+await save(p);
+}
+
+await load();
+render();
 }
 
 async function clearAll(){
 await db.from("timers").delete().neq("name","__none__");
 players={};
-document.getElementById("list").innerHTML="";
-}
-
-/* ================= MAIN RENDER ================= */
-
-function renderAll(){
-ensureRows();
-updateUI();
+render();
 }
 
 /* ================= SYNC ================= */
 
 async function sync(){
 await load();
-renderAll();
+render();
 }
 
 /* ================= INIT ================= */
 
 async function init(){
 await load();
-renderAll();
+render();
 
 setInterval(sync,3000);
-setInterval(updateUI,1000);
+setInterval(render,1000);
 }
 
 init();
