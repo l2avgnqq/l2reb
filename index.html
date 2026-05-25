@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>EXP Lineage2</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -9,11 +11,11 @@
 <style>
 
 body{
-    font-family: Arial;
-    background:#131722;
-    color:white;
     margin:0;
     padding:0;
+    background:#111827;
+    color:white;
+    font-family:Arial;
 }
 
 .top{
@@ -26,9 +28,9 @@ h1{
 }
 
 input,button{
-    padding:8px 12px;
+    padding:10px 14px;
     border:none;
-    border-radius:8px;
+    border-radius:10px;
     margin:4px;
     font-size:14px;
 }
@@ -41,46 +43,43 @@ input{
 button{
     cursor:pointer;
     font-weight:bold;
-    transition:0.2s;
+    transition:0.15s;
 }
 
 button:hover{
-    opacity:0.9;
+    opacity:0.92;
     transform:scale(1.03);
 }
 
-#addBtn{
-    background:#e74c3c;
-    color:white;
-}
-
-#addAllBtn{
-    background:#9b59b6;
-    color:white;
-}
-
-.global{
-    background:#34495e;
-    color:white;
-}
-
 .players{
-    max-width:1100px;
+    max-width:1200px;
     margin:auto;
     padding:15px;
 }
 
 .player{
-    display:flex;
-    align-items:center;
-    gap:10px;
 
     background:#1e293b;
 
-    padding:12px;
-    margin-bottom:8px;
+    border-radius:14px;
 
-    border-radius:12px;
+    padding:14px;
+
+    margin-bottom:10px;
+
+    display:flex;
+    align-items:center;
+    gap:12px;
+
+    flex-wrap:wrap;
+}
+
+.warning{
+    background:#5a3b00;
+}
+
+.danger{
+    background:#5a0000;
 }
 
 .playerIndex{
@@ -92,33 +91,17 @@ button:hover{
     width:180px;
     font-weight:bold;
     overflow:hidden;
-    text-overflow:ellipsis;
 }
 
 .playerTime{
-    width:110px;
-    font-size:18px;
-    font-weight:bold;
+    width:120px;
     color:#00ff95;
-}
-
-.playerActions{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    flex-wrap:wrap;
+    font-size:24px;
+    font-weight:bold;
 }
 
 .smallInput{
     width:70px;
-}
-
-.warning{
-    background:rgba(255,165,0,0.18);
-}
-
-.danger{
-    background:rgba(255,0,0,0.25);
 }
 
 .pauseBtn{
@@ -136,18 +119,25 @@ button:hover{
     color:white;
 }
 
-.addMiniBtn{
+.addBtn{
     background:#3498db;
+    color:white;
+}
+
+.global{
+    background:#6b7280;
     color:white;
 }
 
 @media(max-width:768px){
 
     .player{
-        flex-wrap:wrap;
+        flex-direction:column;
+        align-items:flex-start;
     }
 
-    .playerName{
+    .playerName,
+    .playerTime{
         width:100%;
     }
 
@@ -163,203 +153,331 @@ button:hover{
 <h1>EXP Lineage2</h1>
 
 <input id="name" placeholder="Имя">
-<input id="minutes" type="number" placeholder="Минуты">
-<button id="addBtn">Добавить</button>
+
+<input
+    id="minutes"
+    type="number"
+    placeholder="Минуты"
+>
+
+<button onclick="addPlayer()" class="addBtn">
+Добавить
+</button>
 
 <br>
 
-<input id="allMinutes" type="number" placeholder="+ всем минут">
-<button id="addAllBtn">Добавить всем</button>
+<input
+    id="allMinutes"
+    type="number"
+    placeholder="+ всем минут"
+>
+
+<button onclick="addAll()" class="addBtn">
+Добавить всем
+</button>
 
 <br><br>
 
-<button id="pauseAll" class="global">
-    Пауза всем
+<button onclick="pauseAll()" class="global">
+Пауза всем
 </button>
 
-<button id="resumeAll" class="global">
-    Старт всем
+<button onclick="resumeAll()" class="global">
+Старт всем
 </button>
 
-<button id="clearAll" class="global">
-    Очистить
+<button onclick="clearAll()" class="global">
+Очистить
 </button>
 
 </div>
 
 <div id="players" class="players"></div>
 
+<audio id="alarm" preload="auto">
+<source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
+</audio>
+
 <script>
 
-const SUPABASE_URL = "https://mxwtlfkhykqegzytotlq.supabase.co";
+/* =========================
+   SUPABASE
+========================= */
 
-const SUPABASE_KEY = "sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
+const SUPABASE_URL =
+"https://mxwtlfkhykqegzytotlq.supabase.co";
 
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_KEY =
+"sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 
-let data = {};
+const db = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
 
-/* ---------- FORMAT ---------- */
+/* =========================
+   DATA
+========================= */
+
+let players = {};
+
+let notified = {};
+
+/* =========================
+   FORMAT TIME
+========================= */
 
 function formatTime(sec){
 
+    sec = Math.max(0, sec);
+
     const h = Math.floor(sec / 3600);
+
     const m = Math.floor((sec % 3600) / 60);
+
     const s = sec % 60;
 
     return [
+
         h,
-        m.toString().padStart(2,"0"),
-        s.toString().padStart(2,"0")
+
+        String(m).padStart(2,"0"),
+
+        String(s).padStart(2,"0")
+
     ].join(":");
+
 }
 
-/* ---------- LOAD ---------- */
+/* =========================
+   GET REMAINING
+========================= */
 
-async function load(){
+function getRemaining(p){
 
-    const { data: rows, error } = await db
+    if(!p.running){
+
+        return p.duration;
+
+    }
+
+    const passed = Math.floor(
+
+        (Date.now() -
+        new Date(p.started_at)) / 1000
+
+    );
+
+    return Math.max(
+        0,
+        p.duration - passed
+    );
+
+}
+
+/* =========================
+   LOAD
+========================= */
+
+async function loadPlayers(){
+
+    const { data, error } = await db
         .from("timers")
         .select("*");
 
     if(error){
+
         console.log(error);
+
         return;
+
     }
 
-    data = {};
+    players = {};
 
-    (rows || []).forEach(p=>{
-        data[p.name] = p;
+    (data || []).forEach(p=>{
+
+        players[p.name] = p;
+
     });
 
 }
 
-/* ---------- SAVE ---------- */
+/* =========================
+   SAVE
+========================= */
 
-async function save(p){
+async function savePlayer(p){
 
     const { error } = await db
         .from("timers")
-        .upsert(p, { onConflict: "name" });
+        .upsert(p);
 
     if(error){
+
         console.log(error);
-    }
-
-}
-
-/* ---------- UPDATE TIME ---------- */
-
-function updateTime(p){
-
-    if(!p.running) return;
-
-    const last = new Date(p.last_update || Date.now());
-
-    const diff = Math.floor(
-        (Date.now() - last) / 1000
-    );
-
-    if(diff <= 0) return;
-
-    const worked = Math.min(diff, p.time || 0);
-
-    p.time -= worked;
-
-    p.last_update = new Date().toISOString();
-
-    if(p.time <= 0){
-
-        p.time = 0;
-
-        p.running = false;
-
-        save(p);
 
     }
 
 }
 
-/* ---------- RENDER ---------- */
+/* =========================
+   NOTIFICATION
+========================= */
+
+function playAlarm(name){
+
+    try{
+
+        const audio =
+        document.getElementById("alarm");
+
+        audio.currentTime = 0;
+
+        audio.play();
+
+    }catch(e){}
+
+    document.title =
+    "⏰ EXP закончился: " + name;
+
+    if("Notification" in window){
+
+        if(Notification.permission === "granted"){
+
+            new Notification(
+                "EXP закончилось",
+                {
+                    body:name
+                }
+            );
+
+        }
+
+    }
+
+}
+
+/* =========================
+   RENDER
+========================= */
 
 function render(){
 
-    const container = document.getElementById("players");
+    const container =
+    document.getElementById("players");
 
     container.innerHTML = "";
 
-    Object.values(data).forEach(p=>{
+    const arr = Object.values(players)
 
-        if(p.running){
-            updateTime(p);
+    .sort((a,b)=>
+
+        getRemaining(a) -
+        getRemaining(b)
+
+    );
+
+    arr.forEach((p,index)=>{
+
+        const remain =
+        getRemaining(p);
+
+        if(remain <= 0 && p.running){
+
+            p.running = false;
+
+            p.duration = 0;
+
+            savePlayer(p);
+
+            if(!notified[p.name]){
+
+                notified[p.name] = true;
+
+                playAlarm(p.name);
+
+            }
+
         }
 
-    });
-
-    const arr = Object.values(data)
-        .sort((a,b)=>a.time-b.time);
-
-    arr.forEach((p,i)=>{
-
-        const div = document.createElement("div");
+        const div =
+        document.createElement("div");
 
         div.className = "player";
 
-        if(p.time <= 300 && p.time > 60){
+        if(remain <= 300 && remain > 60){
+
             div.classList.add("warning");
+
         }
 
-        if(p.time <= 60){
+        if(remain <= 60){
+
             div.classList.add("danger");
+
         }
 
-        const safeName = p.name.replace(/'/g, "\\'");
+        const controls = p.running
+
+        ?
+
+        `
+        <button
+            class="pauseBtn"
+            onclick="pausePlayer('${p.name}')"
+        >
+            Пауза
+        </button>
+        `
+
+        :
+
+        `
+        <button
+            class="resumeBtn"
+            onclick="resumePlayer('${p.name}')"
+        >
+            Старт
+        </button>
+        `;
 
         div.innerHTML = `
 
-            <div class="playerIndex">
-                ${i+1}
-            </div>
+        <div class="playerIndex">
+            ${index+1}
+        </div>
 
-            <div class="playerName">
-                ${p.name}
-            </div>
+        <div class="playerName">
+            ${p.name}
+        </div>
 
-            <div class="playerTime">
-                ${formatTime(p.time)}
-            </div>
+        <div class="playerTime">
+            ${formatTime(remain)}
+        </div>
 
-            <div class="playerActions">
+        ${controls}
 
-                <button class="pauseBtn"
-                    onclick="pause('${safeName}')">
-                    Пауза
-                </button>
+        <input
+            type="number"
+            id="add_${p.name}"
+            class="smallInput"
+            placeholder="мин"
+        >
 
-                <button class="resumeBtn"
-                    onclick="resume('${safeName}')">
-                    Старт
-                </button>
+        <button
+            class="addBtn"
+            onclick="addTime('${p.name}')"
+        >
+            Добавить
+        </button>
 
-                <input
-                    type="number"
-                    id="add_${safeName}"
-                    class="smallInput"
-                    placeholder="Мин"
-                >
-
-                <button class="addMiniBtn"
-                    onclick="addTime('${safeName}')">
-                    Добавить
-                </button>
-
-                <button class="deleteBtn"
-                    onclick="delPlayer('${safeName}')">
-                    Удалить
-                </button>
-
-            </div>
+        <button
+            class="deleteBtn"
+            onclick="deletePlayer('${p.name}')"
+        >
+            Удалить
+        </button>
 
         `;
 
@@ -369,9 +487,11 @@ function render(){
 
 }
 
-/* ---------- ADD ---------- */
+/* =========================
+   ADD PLAYER
+========================= */
 
-async function add(){
+async function addPlayer(){
 
     const name = document
         .getElementById("name")
@@ -379,176 +499,241 @@ async function add(){
         .trim();
 
     const min = parseInt(
-        document.getElementById("minutes").value
+
+        document
+        .getElementById("minutes")
+        .value,
+
+        10
+
     );
 
     if(!name || !min){
+
         alert("Введите имя и минуты");
+
         return;
+
     }
 
-    let p = data[name] || {
+    let p = players[name];
 
-        name,
+    if(!p){
 
-        time:0,
+        p = {
 
-        running:false,
+            name,
 
-        last_update:new Date().toISOString()
+            duration:0,
 
-    };
+            started_at:null,
 
-    p.time += min * 60;
+            running:false
+
+        };
+
+    }
+
+    const remain =
+    getRemaining(p);
+
+    p.duration =
+    remain + min * 60;
 
     p.running = true;
 
-    p.last_update = new Date().toISOString();
+    p.started_at =
+    new Date().toISOString();
 
-    await save(p);
+    notified[name] = false;
 
-    data[p.name] = p;
-
-    render();
+    await savePlayer(p);
 
 }
 
-/* ---------- ADD TIME ---------- */
+/* =========================
+   ADD TIME
+========================= */
 
 async function addTime(name){
 
     const val = parseInt(
-        document.getElementById("add_"+name).value
+
+        document
+        .getElementById("add_"+name)
+        .value,
+
+        10
+
     );
 
-    if(!val) return;
+    if(!val){
 
-    let p = data[name];
+        return;
 
-    p.time += val * 60;
+    }
+
+    const p = players[name];
+
+    const remain =
+    getRemaining(p);
+
+    p.duration =
+    remain + val * 60;
 
     p.running = true;
 
-    p.last_update = new Date().toISOString();
+    p.started_at =
+    new Date().toISOString();
 
-    await save(p);
+    notified[name] = false;
 
-    render();
+    await savePlayer(p);
 
 }
 
-/* ---------- PAUSE ---------- */
+/* =========================
+   PAUSE
+========================= */
 
-async function pause(name){
+async function pausePlayer(name){
 
-    let p = data[name];
+    const p = players[name];
 
-    updateTime(p);
+    p.duration =
+    getRemaining(p);
 
     p.running = false;
 
-    await save(p);
-
-    render();
+    await savePlayer(p);
 
 }
 
-/* ---------- RESUME ---------- */
+/* =========================
+   RESUME
+========================= */
 
-async function resume(name){
+async function resumePlayer(name){
 
-    let p = data[name];
+    const p = players[name];
 
-    if(p.time <= 0) return;
+    if(p.duration <= 0){
+
+        return;
+
+    }
 
     p.running = true;
 
-    p.last_update = new Date().toISOString();
+    p.started_at =
+    new Date().toISOString();
 
-    await save(p);
-
-    render();
+    await savePlayer(p);
 
 }
 
-/* ---------- DELETE ---------- */
+/* =========================
+   DELETE
+========================= */
 
-async function delPlayer(name){
+async function deletePlayer(name){
 
     await db
         .from("timers")
         .delete()
         .eq("name", name);
 
-    delete data[name];
-
-    render();
-
 }
 
-/* ---------- GLOBAL ---------- */
+/* =========================
+   GLOBAL
+========================= */
 
 async function addAll(){
 
     const min = parseInt(
-        document.getElementById("allMinutes").value
+
+        document
+        .getElementById("allMinutes")
+        .value,
+
+        10
+
     );
 
-    if(!min) return;
+    if(!min){
 
-    for(const name in data){
-
-        let p = data[name];
-
-        p.time += min * 60;
-
-        p.running = true;
-
-        p.last_update = new Date().toISOString();
-
-        await save(p);
+        return;
 
     }
 
-    render();
+    await Promise.all(
+
+        Object.values(players)
+        .map(async p=>{
+
+            const remain =
+            getRemaining(p);
+
+            p.duration =
+            remain + min * 60;
+
+            p.running = true;
+
+            p.started_at =
+            new Date().toISOString();
+
+            return savePlayer(p);
+
+        })
+
+    );
 
 }
 
 async function pauseAll(){
 
-    for(const name in data){
+    await Promise.all(
 
-        let p = data[name];
+        Object.values(players)
+        .map(async p=>{
 
-        updateTime(p);
+            p.duration =
+            getRemaining(p);
 
-        p.running = false;
+            p.running = false;
 
-        await save(p);
+            return savePlayer(p);
 
-    }
+        })
 
-    render();
+    );
 
 }
 
 async function resumeAll(){
 
-    for(const name in data){
+    await Promise.all(
 
-        let p = data[name];
+        Object.values(players)
+        .map(async p=>{
 
-        if(p.time <= 0) continue;
+            if(p.duration <= 0){
 
-        p.running = true;
+                return;
 
-        p.last_update = new Date().toISOString();
+            }
 
-        await save(p);
+            p.running = true;
 
-    }
+            p.started_at =
+            new Date().toISOString();
 
-    render();
+            return savePlayer(p);
+
+        })
+
+    );
 
 }
 
@@ -557,31 +742,23 @@ async function clearAll(){
     await db
         .from("timers")
         .delete()
-        .gt("time",-1);
-
-    data = {};
-
-    render();
+        .gt("duration",-1);
 
 }
 
-/* ---------- BUTTONS ---------- */
-
-document.getElementById("addBtn").onclick = add;
-
-document.getElementById("addAllBtn").onclick = addAll;
-
-document.getElementById("pauseAll").onclick = pauseAll;
-
-document.getElementById("resumeAll").onclick = resumeAll;
-
-document.getElementById("clearAll").onclick = clearAll;
-
-/* ---------- INIT ---------- */
+/* =========================
+   INIT
+========================= */
 
 async function init(){
 
-    await load();
+    if("Notification" in window){
+
+        Notification.requestPermission();
+
+    }
+
+    await loadPlayers();
 
     render();
 
@@ -589,28 +766,36 @@ async function init(){
 
 init();
 
-/* ---------- REALTIME ---------- */
+/* =========================
+   REALTIME
+========================= */
 
-db.channel('timers-realtime')
+db.channel("timers")
 
 .on(
-    'postgres_changes',
+    "postgres_changes",
+
     {
-        event: '*',
-        schema: 'public',
-        table: 'timers'
+        event:"*",
+        schema:"public",
+        table:"timers"
     },
 
     async ()=>{
 
-        await load();
+        await loadPlayers();
 
         render();
 
     }
+
 )
 
 .subscribe();
+
+/* =========================
+   LIVE TIMER
+========================= */
 
 setInterval(render, 1000);
 
