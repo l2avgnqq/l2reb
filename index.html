@@ -2,57 +2,114 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2 </title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>EXP L2</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body{margin:0;background:#0b1220;color:#fff;font-family:Arial}
-.top{text-align:center;padding:20px}
-.players{max-width:1000px;margin:auto;padding:10px}
 
-.player{
-background:#162033;
-margin:8px 0;
-padding:12px;
-border-radius:12px;
-display:flex;
-align-items:center;
-gap:12px;
+body{
+    margin:0;
+    padding:20px;
+    background:#0b1220;
+    color:white;
+    font-family:Arial;
 }
 
-.idx{width:30px;color:#9ca3af;font-weight:bold}
-.name{width:140px;font-weight:bold}
-.time{width:130px;color:#22c55e;font-size:20px;font-weight:bold}
+.top{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.players{
+    max-width:1000px;
+    margin:auto;
+}
+
+.player{
+    background:#162033;
+    border-radius:12px;
+    padding:12px;
+    margin-bottom:10px;
+
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.idx{
+    width:30px;
+    color:#94a3b8;
+    font-weight:bold;
+}
+
+.name{
+    width:150px;
+    font-weight:bold;
+}
+
+.time{
+    width:130px;
+    font-size:22px;
+    font-weight:bold;
+    color:#22c55e;
+}
+
+.warn{
+    background:#3a2d00;
+}
+
+.danger{
+    background:#4a1010;
+}
+
+.actions{
+    margin-left:auto;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
 
 input{
-padding:8px;
-border-radius:10px;
-border:none;
-background:#0f172a;
-color:#fff;
-width:70px;
+    padding:8px;
+    border:none;
+    border-radius:10px;
+    background:#111827;
+    color:white;
 }
 
 button{
-padding:8px 12px;
-border-radius:10px;
-border:none;
-cursor:pointer;
-font-weight:bold;
+    padding:8px 12px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    color:white;
+    font-weight:bold;
 }
 
-.add{background:#3b82f6;color:#fff}
-.pause{background:#f59e0b}
-.resume{background:#22c55e}
-.del{background:#ef4444}
-.global{background:#334155;color:#fff}
+.add{
+    background:#2563eb;
+}
 
-.warn{background:#2a1f00}
-.danger{background:#3a0a0a}
+.pause{
+    background:#f59e0b;
+}
 
-.actions{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
+.resume{
+    background:#22c55e;
+}
+
+.del{
+    background:#ef4444;
+}
+
+.global{
+    background:#334155;
+}
+
 </style>
 </head>
 
@@ -60,230 +117,588 @@ font-weight:bold;
 
 <div class="top">
 
-<h2>EXP L2 </h2>
+    <h2>EXP L2</h2>
 
-<input id="name" placeholder="Имя">
-<input id="min" type="number" placeholder="Мин">
-<button class="add" onclick="addPlayer()">Добавить</button>
+    <input id="name" placeholder="Имя">
+    <input id="minutes" type="number" placeholder="Минут">
 
-<br><br>
+    <button class="add" onclick="addPlayer()">
+        Добавить
+    </button>
 
-<input id="all" type="number" placeholder="+ всем минут">
-<button class="add" onclick="addAll()">+ всем</button>
+    <br><br>
 
-<br><br>
+    <input id="allMinutes" type="number" placeholder="+ всем">
 
-<button class="global" onclick="pauseAll()">⏸ Пауза всем</button>
-<button class="global" onclick="resumeAll()">▶ Старт всем</button>
-<button class="global" onclick="clearAll()">🗑 Очистить</button>
+    <button class="add" onclick="addAll()">
+        + всем
+    </button>
+
+    <br><br>
+
+    <button class="global" onclick="pauseAll()">
+        ⏸ Пауза всем
+    </button>
+
+    <button class="global" onclick="resumeAll()">
+        ▶ Старт всем
+    </button>
+
+    <button class="global" onclick="clearAll()">
+        🗑 Очистить
+    </button>
 
 </div>
 
 <div id="list" class="players"></div>
 
-<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-
 <script>
 
-const SUPABASE_URL="https://mxwtlfkhykqegzytotlq.supabase.co";
-const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
+/* =========================
+   SUPABASE
+========================= */
 
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const SUPABASE_URL =
+"https://mxwtlfkhykqegzytotlq.supabase.co";
 
-let players={};
-let fired={};
+const SUPABASE_KEY =
+"sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 
-/* ================= TIME ================= */
+const db = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
 
-function fmt(s){
-s=Math.max(0,s);
-let h=Math.floor(s/3600);
-let m=Math.floor((s%3600)/60);
-let sec=s%60;
-return `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+/* =========================
+   STATE
+========================= */
+
+let players = {};
+
+/* =========================
+   HELPERS
+========================= */
+
+function safeId(name){
+    return name.replace(/[^a-zA-Z0-9_-]/g,"_");
 }
 
-function remaining(p){
-if(!p.running) return p.time;
-let diff=Math.floor((Date.now()-new Date(p.last_update))/1000);
-return Math.max(0,p.time-diff);
+function formatTime(sec){
+
+    sec = Math.max(0, sec);
+
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+
+    return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
 }
 
-/* ================= LOAD ================= */
+function getRemaining(player){
 
-async function load(){
-const {data}=await db.from("timers").select("*");
+    if(!player.running){
+        return player.time;
+    }
 
-players={};
-(data||[]).forEach(p=>players[p.name]=p);
+    if(!player.last_update){
+        return player.time;
+    }
+
+    const diff = Math.floor(
+        (Date.now() - new Date(player.last_update).getTime()) / 1000
+    );
+
+    return Math.max(0, player.time - diff);
 }
 
-/* ================= CREATE ONCE ================= */
+/* =========================
+   LOAD
+========================= */
 
-function createRow(p){
+async function loadPlayers(){
 
-let div=document.createElement("div");
-div.className="player";
-div.id="row_"+p.name;
+    const { data, error } = await db
+        .from("timers")
+        .select("*");
 
-div.innerHTML=`
-<div class="idx">0</div>
-<div class="name">${p.name}</div>
-<div class="time" id="t_${p.name}">0</div>
+    if(error){
+        console.log(error);
+        return;
+    }
 
-<div class="actions">
+    players = {};
 
-${
-p.running
-? `<button class="pause" onclick="pause('${p.name}')">⏸</button>`
-: `<button class="resume" onclick="resume('${p.name}')">▶</button>`
+    (data || []).forEach(player=>{
+        players[player.name] = player;
+    });
 }
 
-<input id="i_${p.name}" type="number" placeholder="+мин">
-<button class="add" onclick="addTime('${p.name}')">+</button>
-<button class="del" onclick="del('${p.name}')">🗑</button>
+/* =========================
+   SAVE
+========================= */
 
-</div>
-`;
+async function savePlayer(player){
 
-document.getElementById("list").appendChild(div);
+    await db
+        .from("timers")
+        .upsert(player);
 }
 
-/* ================= ENSURE ================= */
+/* =========================
+   CREATE ROW
+========================= */
+
+function createRow(player){
+
+    const id = safeId(player.name);
+
+    const div = document.createElement("div");
+
+    div.className = "player";
+    div.id = "row_" + id;
+
+    div.innerHTML = `
+
+        <div class="idx">0</div>
+
+        <div class="name">
+            ${player.name}
+        </div>
+
+        <div class="time" id="time_${id}">
+            0
+        </div>
+
+        <div class="actions">
+
+            <button id="btn_${id}">
+                ...
+            </button>
+
+            <input
+                id="input_${id}"
+                type="number"
+                placeholder="+мин"
+            >
+
+            <button
+                class="add"
+                onclick="addTime('${player.name}')"
+            >
+                +
+            </button>
+
+            <button
+                class="del"
+                onclick="deletePlayer('${player.name}')"
+            >
+                🗑
+            </button>
+
+        </div>
+
+    `;
+
+    document
+        .getElementById("list")
+        .appendChild(div);
+}
+
+/* =========================
+   CLEANUP
+========================= */
+
+function cleanupRows(){
+
+    document
+        .querySelectorAll(".player")
+        .forEach(row=>{
+
+            const id = row.id.replace("row_","");
+
+            const exists = Object
+                .values(players)
+                .some(player=>safeId(player.name) === id);
+
+            if(!exists){
+                row.remove();
+            }
+
+        });
+}
+
+/* =========================
+   ENSURE ROWS
+========================= */
 
 function ensureRows(){
-for(let p of Object.values(players)){
-if(!document.getElementById("row_"+p.name)){
-createRow(p);
-}
-}
+
+    Object.values(players).forEach(player=>{
+
+        const id = safeId(player.name);
+
+        if(!document.getElementById("row_" + id)){
+            createRow(player);
+        }
+
+    });
 }
 
-/* ================= UPDATE ONLY TEXT ================= */
+/* =========================
+   UPDATE UI
+========================= */
 
 function updateUI(){
 
-let arr=Object.values(players)
-.map(p=>({...p,r:remaining(p)}))
-.sort((a,b)=>a.r-b.r);
+    const sorted = Object
+        .values(players)
 
-arr.forEach((p,i)=>{
+        .map(player=>({
+            ...player,
+            remaining:getRemaining(player)
+        }))
 
-let row=document.getElementById("row_"+p.name);
-if(!row) return;
+        .sort((a,b)=>a.remaining - b.remaining);
 
-/* index */
-row.querySelector(".idx").innerText=i+1;
+    const list = document.getElementById("list");
 
-/* ONLY TIME UPDATE (NO INPUT TOUCH!) */
-let t=document.getElementById("t_"+p.name);
-if(t) t.innerText=fmt(p.r);
+    sorted.forEach((player,index)=>{
 
-/* colors */
-row.classList.remove("warn","danger");
-if(p.r<=300) row.classList.add("warn");
-if(p.r<=60) row.classList.add("danger");
+        const id = safeId(player.name);
 
-});
+        const row = document.getElementById("row_" + id);
 
+        if(!row) return;
+
+        list.appendChild(row);
+
+        row.querySelector(".idx").innerText = index + 1;
+
+        const timeEl = document.getElementById("time_" + id);
+
+        timeEl.innerText = formatTime(player.remaining);
+
+        row.classList.remove("warn","danger");
+
+        if(player.remaining <= 300){
+            row.classList.add("warn");
+        }
+
+        if(player.remaining <= 60){
+            row.classList.add("danger");
+        }
+
+        const btn = document.getElementById("btn_" + id);
+
+        if(player.running){
+
+            btn.innerText = "⏸";
+
+            btn.className = "pause";
+
+            btn.onclick = ()=>pausePlayer(player.name);
+
+        }else{
+
+            btn.innerText = "▶";
+
+            btn.className = "resume";
+
+            btn.onclick = ()=>resumePlayer(player.name);
+
+        }
+
+    });
 }
 
-/* ================= SAVE ================= */
+/* =========================
+   RENDER
+========================= */
 
-async function save(p){
-await db.from("timers").upsert(p);
+function render(){
+
+    cleanupRows();
+
+    ensureRows();
+
+    updateUI();
 }
 
-/* ================= ACTIONS ================= */
+/* =========================
+   ADD PLAYER
+========================= */
 
 async function addPlayer(){
-let name=document.getElementById("name").value.trim();
-let min=parseInt(document.getElementById("min").value,10);
-if(!name||!min) return;
 
-let p=players[name]||{name,time:0,running:false,last_update:null};
+    const name = document
+        .getElementById("name")
+        .value
+        .trim();
 
-p.time=remaining(p)+min*60;
-p.running=true;
-p.last_update=new Date().toISOString();
+    const minutes = parseInt(
+        document.getElementById("minutes").value
+    );
 
-fired[name]=false;
+    if(!name) return;
 
-await save(p);
-await load();
-ensureRows();
-renderAll();
+    if(isNaN(minutes) || minutes <= 0){
+        return;
+    }
+
+    let player = players[name] || {
+        name:name,
+        time:0,
+        running:false,
+        last_update:null
+    };
+
+    player.time =
+        getRemaining(player) + minutes * 60;
+
+    player.running = true;
+
+    player.last_update =
+        new Date().toISOString();
+
+    await savePlayer(player);
+
+    document.getElementById("name").value = "";
+    document.getElementById("minutes").value = "";
+
+    await loadPlayers();
+
+    render();
 }
+
+/* =========================
+   ADD TIME
+========================= */
 
 async function addTime(name){
-let v=parseInt(document.getElementById("i_"+name).value,10);
-if(!v) return;
 
-let p=players[name];
+    const id = safeId(name);
 
-p.time=remaining(p)+v*60;
-p.running=true;
-p.last_update=new Date().toISOString();
+    const minutes = parseInt(
+        document.getElementById("input_" + id).value
+    );
 
-await save(p);
-await load();
-renderAll();
+    if(isNaN(minutes) || minutes <= 0){
+        return;
+    }
+
+    const player = players[name];
+
+    player.time =
+        getRemaining(player) + minutes * 60;
+
+    player.running = true;
+
+    player.last_update =
+        new Date().toISOString();
+
+    await savePlayer(player);
+
+    document.getElementById("input_" + id).value = "";
+
+    await loadPlayers();
+
+    render();
 }
 
-async function pause(name){
-let p=players[name];
-p.time=remaining(p);
-p.running=false;
-await save(p);
-await load();
-renderAll();
+/* =========================
+   PAUSE
+========================= */
+
+async function pausePlayer(name){
+
+    const player = players[name];
+
+    player.time = getRemaining(player);
+
+    player.running = false;
+
+    player.last_update = null;
+
+    await savePlayer(player);
+
+    await loadPlayers();
+
+    render();
 }
 
-async function resume(name){
-let p=players[name];
-if(p.time<=0) return;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-await load();
-renderAll();
+/* =========================
+   RESUME
+========================= */
+
+async function resumePlayer(name){
+
+    const player = players[name];
+
+    if(getRemaining(player) <= 0){
+        return;
+    }
+
+    player.running = true;
+
+    player.last_update =
+        new Date().toISOString();
+
+    await savePlayer(player);
+
+    await loadPlayers();
+
+    render();
 }
 
-async function del(name){
-await db.from("timers").delete().eq("name",name);
-delete players[name];
-await load();
-renderAll();
+/* =========================
+   DELETE
+========================= */
+
+async function deletePlayer(name){
+
+    await db
+        .from("timers")
+        .delete()
+        .eq("name", name);
+
+    delete players[name];
+
+    render();
 }
+
+/* =========================
+   ADD ALL
+========================= */
+
+async function addAll(){
+
+    const minutes = parseInt(
+        document.getElementById("allMinutes").value
+    );
+
+    if(isNaN(minutes) || minutes <= 0){
+        return;
+    }
+
+    for(const player of Object.values(players)){
+
+        player.time =
+            getRemaining(player) + minutes * 60;
+
+        player.running = true;
+
+        player.last_update =
+            new Date().toISOString();
+
+        await savePlayer(player);
+    }
+
+    document.getElementById("allMinutes").value = "";
+
+    await loadPlayers();
+
+    render();
+}
+
+/* =========================
+   PAUSE ALL
+========================= */
+
+async function pauseAll(){
+
+    for(const player of Object.values(players)){
+
+        player.time = getRemaining(player);
+
+        player.running = false;
+
+        player.last_update = null;
+
+        await savePlayer(player);
+    }
+
+    await loadPlayers();
+
+    render();
+}
+
+/* =========================
+   RESUME ALL
+========================= */
+
+async function resumeAll(){
+
+    for(const player of Object.values(players)){
+
+        if(getRemaining(player) <= 0){
+            continue;
+        }
+
+        player.running = true;
+
+        player.last_update =
+            new Date().toISOString();
+
+        await savePlayer(player);
+    }
+
+    await loadPlayers();
+
+    render();
+}
+
+/* =========================
+   CLEAR ALL
+========================= */
 
 async function clearAll(){
-await db.from("timers").delete().neq("name","__none__");
-players={};
-document.getElementById("list").innerHTML="";
+
+    await db
+        .from("timers")
+        .delete()
+        .neq("name","___");
+
+    players = {};
+
+    document.getElementById("list").innerHTML = "";
 }
 
-/* ================= MAIN RENDER ================= */
+/* =========================
+   REALTIME
+========================= */
 
-function renderAll(){
-ensureRows();
-updateUI();
-}
+db.channel("timers-realtime")
 
-/* ================= SYNC ================= */
+.on(
+    "postgres_changes",
+    {
+        event:"*",
+        schema:"public",
+        table:"timers"
+    },
 
-async function sync(){
-await load();
-renderAll();
-}
+    async ()=>{
 
-/* ================= INIT ================= */
+        await loadPlayers();
+
+        render();
+
+    }
+)
+
+.subscribe();
+
+/* =========================
+   INIT
+========================= */
 
 async function init(){
-await load();
-renderAll();
 
-setInterval(sync,3000);
-setInterval(updateUI,1000);
+    await loadPlayers();
+
+    render();
+
+    setInterval(updateUI,1000);
 }
 
 init();
