@@ -8,57 +8,114 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body{margin:0;background:#0f172a;color:#fff;font-family:Arial}
+body{
+margin:0;
+background:#0b1220;
+color:#fff;
+font-family:Arial;
+}
 
-.top{text-align:center;padding:20px}
-.players{max-width:1000px;margin:auto;padding:10px}
+.top{
+text-align:center;
+padding:20px;
+}
+
+.players{
+max-width:1000px;
+margin:auto;
+padding:10px;
+}
 
 .player{
-background:#1e293b;
-margin:8px 0;
-padding:12px;
-border-radius:12px;
+background:#162033;
+margin:10px 0;
+padding:14px;
+border-radius:14px;
 display:flex;
-gap:10px;
 align-items:center;
+gap:14px;
 flex-wrap:wrap;
 }
 
-.name{width:150px;font-weight:bold}
-.time{width:120px;color:#00ff95;font-size:20px;font-weight:bold}
+.name{
+width:140px;
+font-weight:bold;
+color:#e5e7eb;
+}
+
+.time{
+width:130px;
+color:#22c55e;
+font-size:20px;
+font-weight:bold;
+}
+
+/* ===== INPUT ===== */
 
 input{
 padding:8px;
-border-radius:8px;
+border-radius:10px;
 border:none;
-background:#111827;
+background:#0f172a;
 color:#fff;
-width:70px;
+width:80px;
+outline:none;
 }
 
+/* ===== BUTTONS ===== */
+
 button{
-padding:8px 12px;
+padding:8px 14px;
 border-radius:10px;
 border:none;
 cursor:pointer;
 font-weight:bold;
+transition:.15s;
 }
 
-.add{background:#2563eb;color:#fff}
-.pause{background:#f59e0b}
-.resume{background:#22c55e}
-.del{background:#ef4444}
-.global{background:#334155;color:#fff}
-.sound{background:#6366f1;color:#fff}
+button:hover{
+transform:scale(1.05);
+opacity:.9;
+}
 
-.warn{background:#3a2a00}
-.danger{background:#4a0000}
+/* ===== COLORS ===== */
+
+.add{background:#3b82f6;color:#fff}
+
+.pause{background:#f59e0b;color:#111}
+.resume{background:#22c55e;color:#111}
+.del{background:#ef4444;color:#fff}
+
+.global{
+background:#334155;
+color:#fff;
+}
+
+.sound{
+background:#6366f1;
+color:#fff;
+}
+
+/* ===== WARNING ===== */
+
+.warn{background:#2a1f00}
+.danger{background:#3a0a0a}
 .flash{animation:blink .8s infinite}
 
 @keyframes blink{
 0%{opacity:1}
 50%{opacity:.4}
 100%{opacity:1}
+}
+
+/* ===== SPACING FIX ===== */
+
+.actions{
+display:flex;
+gap:10px;
+align-items:center;
+flex-wrap:wrap;
+margin-left:auto;
 }
 
 </style>
@@ -83,7 +140,7 @@ font-weight:bold;
 <input id="all" type="number" placeholder="+ всем минут">
 <button class="add" onclick="addAll()">+ всем</button>
 
-<br>
+<br><br>
 
 <button class="global" onclick="pauseAll()">⏸ Пауза всем</button>
 <button class="global" onclick="resumeAll()">▶ Старт всем</button>
@@ -119,7 +176,6 @@ if(!soundOn) return;
 const a=document.getElementById("alarm");
 a.currentTime=0;
 a.play().catch(()=>alert("ВРЕМЯ ВЫШЛО!"));
-document.title="⏰ TIME OUT";
 }
 
 /* ===== TIME ===== */
@@ -150,25 +206,69 @@ async function save(p){
 await db.from("timers").upsert(p);
 }
 
-/* ===== RENDER ===== */
+/* ===== RENDER ONCE ===== */
 
-function render(){
+function createRow(p){
+
+let div=document.createElement("div");
+div.className="player";
+div.id="row_"+p.name;
+
+div.innerHTML=`
+<div class="name">${p.name}</div>
+<div class="time" id="t_${p.name}">0</div>
+
+<div class="actions">
+
+${
+p.running
+? `<button class="pause" onclick="pause('${p.name}')">⏸</button>`
+: `<button class="resume" onclick="resume('${p.name}')">▶</button>`
+}
+
+<input id="i_${p.name}" type="number" placeholder="+мин">
+<button class="add" onclick="addTime('${p.name}')">+</button>
+<button class="del" onclick="del('${p.name}')">🗑</button>
+
+</div>
+`;
+
+document.getElementById("list").appendChild(div);
+}
+
+function renderAll(){
 
 const list=document.getElementById("list");
 list.innerHTML="";
 
 Object.values(players)
 .sort((a,b)=>remaining(a)-remaining(b))
-.forEach((p,i)=>{
+.forEach(p=>createRow(p));
+}
+
+/* ===== LIVE UPDATE TIME ONLY ===== */
+
+function tick(){
+
+Object.values(players).forEach(p=>{
 
 let t=remaining(p);
 
-let div=document.createElement("div");
-div.className="player";
+let el=document.getElementById("t_"+p.name);
+if(el) el.innerText=fmt(t);
 
-if(t<=300) div.classList.add("warn");
-if(t<=60) div.classList.add("danger");
-if(t<=30) div.classList.add("flash");
+let row=document.getElementById("row_"+p.name);
+if(!row) return;
+
+/* COLORS */
+
+row.classList.remove("warn","danger","flash");
+
+if(t<=300) row.classList.add("warn");
+if(t<=60) row.classList.add("danger");
+if(t<=30) row.classList.add("flash");
+
+/* END */
 
 if(t<=0 && p.running){
 p.running=false;
@@ -181,31 +281,13 @@ playSound();
 }
 }
 
-/* ===== INPUT FIX ===== */
-
-div.innerHTML=`
-<div>${i+1}</div>
-<div class="name">${p.name}</div>
-<div class="time">${fmt(t)}</div>
-
-${
-p.running
-? `<button class="pause" onclick="pause('${p.name}')">⏸</button>`
-: `<button class="resume" onclick="resume('${p.name}')">▶</button>`
-}
-
-<input data-name="${p.name}" type="number" placeholder="+мин">
-<button class="add" onclick="addTime('${p.name}')">+</button>
-<button class="del" onclick="del('${p.name}')">🗑</button>
-`;
-
-list.appendChild(div);
 });
 }
 
 /* ===== ACTIONS ===== */
 
 async function addPlayer(){
+
 let name=document.getElementById("name").value.trim();
 let min=parseInt(document.getElementById("min").value,10);
 if(!name||!min) return;
@@ -220,13 +302,12 @@ fired[name]=false;
 
 await save(p);
 await load();
-render();
+renderAll();
 }
 
 async function addTime(name){
 
-let input=document.querySelector(`input[data-name="${name}"]`);
-let v=parseInt(input.value,10);
+let v=parseInt(document.getElementById("i_"+name).value,10);
 if(!v) return;
 
 let p=players[name];
@@ -239,7 +320,7 @@ fired[name]=false;
 
 await save(p);
 await load();
-render();
+renderAll();
 }
 
 async function pause(name){
@@ -248,7 +329,7 @@ p.time=remaining(p);
 p.running=false;
 await save(p);
 await load();
-render();
+renderAll();
 }
 
 async function resume(name){
@@ -258,13 +339,13 @@ p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
 await load();
-render();
+renderAll();
 }
 
 async function del(name){
 await db.from("timers").delete().eq("name",name);
 delete players[name];
-render();
+renderAll();
 }
 
 /* ===== GLOBAL ===== */
@@ -281,7 +362,7 @@ await save(p);
 }
 
 await load();
-render();
+renderAll();
 }
 
 async function pauseAll(){
@@ -292,7 +373,7 @@ await save(p);
 }
 
 await load();
-render();
+renderAll();
 }
 
 async function resumeAll(){
@@ -304,24 +385,24 @@ await save(p);
 }
 
 await load();
-render();
+renderAll();
 }
 
 async function clearAll(){
 await db.from("timers").delete().gt("time",-1);
 players={};
-render();
+renderAll();
 }
 
 /* ===== INIT ===== */
 
 async function init(){
 await load();
-render();
+renderAll();
+setInterval(tick,1000);
 }
 
 init();
-setInterval(render,1000);
 
 </script>
 
