@@ -35,6 +35,7 @@ body{
     align-items:center;
     gap:10px;
     flex-wrap:wrap;
+    transition:.15s;
 }
 
 .warn{background:#3a2c00}
@@ -132,24 +133,30 @@ button{
 
 <script>
 
-/* ================= CONFIG ================= */
+/* ================= SUPABASE ================= */
 
 const db = supabase.createClient(
     "https://mxwtlfkhykqegzytotlq.supabase.co",
     "sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp"
 );
 
+/* ================= STATE ================= */
+
 let players = {};
 
 /* ================= HELPERS ================= */
 
-const id = s => s.replace(/[^a-z0-9]/gi,"_");
+const id = s =>
+    s.replace(/[^a-z0-9]/gi,"_");
 
 const fmt = s => {
+
     s=Math.max(0,s);
+
     let h=Math.floor(s/3600);
     let m=Math.floor((s%3600)/60);
     let sec=s%60;
+
     return `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 };
 
@@ -158,40 +165,43 @@ const left = p => {
     if(!p.running || !p.last_update)
         return p.time;
 
-    return Math.max(
-        0,
-        p.time - Math.floor(
-            (Date.now()-new Date(p.last_update))/1000
-        )
+    let diff=Math.floor(
+        (Date.now()-new Date(p.last_update))/1000
     );
+
+    return Math.max(0,p.time-diff);
 };
 
 /* ================= DB ================= */
 
 async function load(){
 
-    let {data} = await db
+    let {data}=await db
         .from("timers")
         .select("*");
 
-    players = {};
+    players={};
 
     (data||[]).forEach(
-        p => players[p.name]=p
+        p=>players[p.name]=p
     );
 }
 
 const save = p =>
     db.from("timers").upsert(p);
 
-/* ================= UI ================= */
+/* ================= CREATE ROW ================= */
 
-function row(p){
+function createRow(p){
 
     let pid=id(p.name);
 
-    return `
-    <div class="player" id="r_${pid}">
+    let div=document.createElement("div");
+
+    div.className="player";
+    div.id="r_"+pid;
+
+    div.innerHTML=`
 
         <div class="idx"></div>
 
@@ -205,7 +215,8 @@ function row(p){
 
         <div class="actions">
 
-            <button id="b_${pid}"></button>
+            <button id="b_${pid}">
+            </button>
 
             <input
                 id="i_${pid}"
@@ -228,14 +239,55 @@ function row(p){
             </button>
 
         </div>
-
-    </div>
     `;
+
+    document
+        .getElementById("list")
+        .appendChild(div);
 }
+
+/* ================= RENDER ================= */
 
 function render(){
 
-    let arr = Object.values(players)
+    /* remove deleted */
+
+    document
+    .querySelectorAll(".player")
+    .forEach(r=>{
+
+        let rid=r.id.replace("r_","");
+
+        let exists=Object.values(players)
+        .some(p=>id(p.name)===rid);
+
+        if(!exists){
+            r.remove();
+        }
+
+    });
+
+    /* create missing */
+
+    Object.values(players)
+    .forEach(p=>{
+
+        let pid=id(p.name);
+
+        if(!document.getElementById("r_"+pid)){
+            createRow(p);
+        }
+
+    });
+
+    updateTimers();
+}
+
+/* ================= UPDATE ================= */
+
+function updateTimers(){
+
+    let arr=Object.values(players)
 
     .map(p=>({
         ...p,
@@ -246,26 +298,42 @@ function render(){
 
     let list=document.getElementById("list");
 
-    list.innerHTML="";
-
     arr.forEach((p,i)=>{
-
-        list.innerHTML+=row(p);
 
         let pid=id(p.name);
 
-        let r=document.getElementById("r_"+pid);
+        let row=document.getElementById("r_"+pid);
 
-        r.querySelector(".idx").innerText=i+1;
+        if(!row) return;
+
+        /* sort */
+
+        list.appendChild(row);
+
+        /* index */
+
+        row.querySelector(".idx")
+        .innerText=i+1;
+
+        /* time */
 
         document.getElementById("t_"+pid)
-            .innerText=fmt(p.remain);
+        .innerText=fmt(p.remain);
+
+        /* colors */
+
+        row.classList.remove(
+            "warn",
+            "danger"
+        );
 
         if(p.remain<=300)
-            r.classList.add("warn");
+            row.classList.add("warn");
 
         if(p.remain<=60)
-            r.classList.add("danger");
+            row.classList.add("danger");
+
+        /* button */
 
         let btn=document.getElementById("b_"+pid);
 
@@ -283,6 +351,7 @@ function render(){
         }
 
     });
+
 }
 
 /* ================= ACTIONS ================= */
@@ -290,6 +359,7 @@ function render(){
 async function addPlayer(){
 
     let name=nameInput.value.trim();
+
     let min=parseInt(minInput.value);
 
     if(!name || min<=0) return;
@@ -297,12 +367,16 @@ async function addPlayer(){
     let p=players[name] || {
         name,
         time:0,
-        running:false
+        running:false,
+        last_update:null
     };
 
     p.time=left(p)+min*60;
+
     p.running=true;
-    p.last_update=new Date().toISOString();
+
+    p.last_update=
+        new Date().toISOString();
 
     await save(p);
 
@@ -310,13 +384,16 @@ async function addPlayer(){
     minInput.value="";
 
     await load();
+
     render();
 }
 
 async function addTime(name){
 
     let v=parseInt(
-        document.getElementById("i_"+id(name)).value
+        document.getElementById(
+            "i_"+id(name)
+        ).value
     );
 
     if(v<=0) return;
@@ -324,12 +401,16 @@ async function addTime(name){
     let p=players[name];
 
     p.time=left(p)+v*60;
+
     p.running=true;
-    p.last_update=new Date().toISOString();
+
+    p.last_update=
+        new Date().toISOString();
 
     await save(p);
 
     await load();
+
     render();
 }
 
@@ -338,12 +419,15 @@ async function pausePlayer(name){
     let p=players[name];
 
     p.time=left(p);
+
     p.running=false;
+
     p.last_update=null;
 
     await save(p);
 
     await load();
+
     render();
 }
 
@@ -354,11 +438,14 @@ async function resumePlayer(name){
     if(left(p)<=0) return;
 
     p.running=true;
-    p.last_update=new Date().toISOString();
+
+    p.last_update=
+        new Date().toISOString();
 
     await save(p);
 
     await load();
+
     render();
 }
 
@@ -383,13 +470,17 @@ async function addAll(){
     for(let p of Object.values(players)){
 
         p.time=left(p)+v*60;
+
         p.running=true;
-        p.last_update=new Date().toISOString();
+
+        p.last_update=
+            new Date().toISOString();
 
         await save(p);
     }
 
     await load();
+
     render();
 }
 
@@ -398,13 +489,16 @@ async function pauseAll(){
     for(let p of Object.values(players)){
 
         p.time=left(p);
+
         p.running=false;
+
         p.last_update=null;
 
         await save(p);
     }
 
     await load();
+
     render();
 }
 
@@ -415,12 +509,15 @@ async function resumeAll(){
         if(left(p)<=0) continue;
 
         p.running=true;
-        p.last_update=new Date().toISOString();
+
+        p.last_update=
+            new Date().toISOString();
 
         await save(p);
     }
 
     await load();
+
     render();
 }
 
@@ -447,9 +544,13 @@ db.channel("timers")
         schema:"public",
         table:"timers"
     },
+
     async ()=>{
+
         await load();
+
         render();
+
     }
 )
 
@@ -457,8 +558,11 @@ db.channel("timers")
 
 /* ================= INIT ================= */
 
-const nameInput=document.getElementById("name");
-const minInput=document.getElementById("min");
+const nameInput=
+    document.getElementById("name");
+
+const minInput=
+    document.getElementById("min");
 
 async function init(){
 
@@ -466,7 +570,7 @@ async function init(){
 
     render();
 
-    setInterval(render,1000);
+    setInterval(updateTimers,1000);
 }
 
 init();
