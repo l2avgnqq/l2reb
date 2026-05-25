@@ -28,19 +28,25 @@ padding:10px;
 
 .player{
 background:#162033;
-margin:10px 0;
-padding:14px;
-border-radius:14px;
+margin:8px 0;
+padding:12px;
+border-radius:12px;
 display:flex;
 align-items:center;
-gap:14px;
+gap:12px;
 flex-wrap:wrap;
+transition:.2s;
+}
+
+.idx{
+width:30px;
+color:#9ca3af;
+font-weight:bold;
 }
 
 .name{
 width:140px;
 font-weight:bold;
-color:#e5e7eb;
 }
 
 .time{
@@ -50,22 +56,17 @@ font-size:20px;
 font-weight:bold;
 }
 
-/* ===== INPUT ===== */
-
 input{
 padding:8px;
 border-radius:10px;
 border:none;
 background:#0f172a;
 color:#fff;
-width:80px;
-outline:none;
+width:70px;
 }
 
-/* ===== BUTTONS ===== */
-
 button{
-padding:8px 14px;
+padding:8px 12px;
 border-radius:10px;
 border:none;
 cursor:pointer;
@@ -73,30 +74,14 @@ font-weight:bold;
 transition:.15s;
 }
 
-button:hover{
-transform:scale(1.05);
-opacity:.9;
-}
-
-/* ===== COLORS ===== */
+button:hover{transform:scale(1.05)}
 
 .add{background:#3b82f6;color:#fff}
-
-.pause{background:#f59e0b;color:#111}
-.resume{background:#22c55e;color:#111}
-.del{background:#ef4444;color:#fff}
-
-.global{
-background:#334155;
-color:#fff;
-}
-
-.sound{
-background:#6366f1;
-color:#fff;
-}
-
-/* ===== WARNING ===== */
+.pause{background:#f59e0b}
+.resume{background:#22c55e}
+.del{background:#ef4444}
+.global{background:#334155;color:#fff}
+.sound{background:#6366f1;color:#fff}
 
 .warn{background:#2a1f00}
 .danger{background:#3a0a0a}
@@ -108,14 +93,12 @@ color:#fff;
 100%{opacity:1}
 }
 
-/* ===== SPACING FIX ===== */
-
 .actions{
 display:flex;
 gap:10px;
 align-items:center;
-flex-wrap:wrap;
 margin-left:auto;
+flex-wrap:wrap;
 }
 
 </style>
@@ -202,19 +185,15 @@ players={};
 (data||[]).forEach(p=>players[p.name]=p);
 }
 
-async function save(p){
-await db.from("timers").upsert(p);
-}
-
-/* ===== RENDER ONCE ===== */
+/* ===== CREATE DOM ONCE ===== */
 
 function createRow(p){
-
-let div=document.createElement("div");
+const div=document.createElement("div");
 div.className="player";
 div.id="row_"+p.name;
 
 div.innerHTML=`
+<div class="idx"></div>
 <div class="name">${p.name}</div>
 <div class="time" id="t_${p.name}">0</div>
 
@@ -236,40 +215,44 @@ p.running
 document.getElementById("list").appendChild(div);
 }
 
-function renderAll(){
+/* ===== RENDER ONLY ON LOAD/CHANGE ===== */
 
+function renderAll(){
 const list=document.getElementById("list");
 list.innerHTML="";
-
-Object.values(players)
-.sort((a,b)=>remaining(a)-remaining(b))
-.forEach(p=>createRow(p));
+Object.values(players).forEach(p=>createRow(p));
+updateNumbers();
 }
 
-/* ===== LIVE UPDATE TIME ONLY ===== */
+/* ===== LIVE UPDATE ===== */
 
 function tick(){
 
-Object.values(players).forEach(p=>{
+let arr=Object.values(players)
+.sort((a,b)=>remaining(a)-remaining(b));
+
+arr.forEach((p,i)=>{
 
 let t=remaining(p);
 
-let el=document.getElementById("t_"+p.name);
-if(el) el.innerText=fmt(t);
+/* time */
+let tEl=document.getElementById("t_"+p.name);
+if(tEl) tEl.innerText=fmt(t);
 
+/* index FIX */
 let row=document.getElementById("row_"+p.name);
-if(!row) return;
+if(row){
+row.querySelector(".idx").innerText=i+1;
 
-/* COLORS */
-
+/* colors */
 row.classList.remove("warn","danger","flash");
 
 if(t<=300) row.classList.add("warn");
 if(t<=60) row.classList.add("danger");
 if(t<=30) row.classList.add("flash");
+}
 
-/* END */
-
+/* end */
 if(t<=0 && p.running){
 p.running=false;
 p.time=0;
@@ -282,12 +265,18 @@ playSound();
 }
 
 });
+
+}
+
+/* ===== SAVE ===== */
+
+async function save(p){
+await db.from("timers").upsert(p);
 }
 
 /* ===== ACTIONS ===== */
 
 async function addPlayer(){
-
 let name=document.getElementById("name").value.trim();
 let min=parseInt(document.getElementById("min").value,10);
 if(!name||!min) return;
@@ -306,7 +295,6 @@ renderAll();
 }
 
 async function addTime(name){
-
 let v=parseInt(document.getElementById("i_"+name).value,10);
 if(!v) return;
 
