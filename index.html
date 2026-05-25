@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2 FIX</title>
+<title>EXP L2</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -21,6 +21,7 @@ display:flex;
 align-items:center;
 gap:12px;
 flex-wrap:wrap;
+transition:.2s;
 }
 
 .idx{width:30px;color:#9ca3af;font-weight:bold}
@@ -51,15 +52,9 @@ font-weight:bold;
 .global{background:#334155;color:#fff}
 .sound{background:#6366f1;color:#fff}
 
+/* только подсветка без мигания */
 .warn{background:#2a1f00}
 .danger{background:#3a0a0a}
-.flash{animation:blink .8s infinite}
-
-@keyframes blink{
-0%{opacity:1}
-50%{opacity:.4}
-100%{opacity:1}
-}
 
 .actions{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
 
@@ -72,7 +67,7 @@ font-weight:bold;
 
 <h2>EXP L2</h2>
 
-<button class="sound" onclick="toggleSound()" id="soundBtn">🔊 Звук</button>
+<button class="sound" onclick="unlockSound()" id="soundBtn">🔊 Звук</button>
 
 <br><br>
 
@@ -105,18 +100,25 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
-let fired={};
-let soundOn=true;
+let soundEnabled=false;
 
-/* SOUND */
+/* ================= SOUND FIX (PC SAFE) ================= */
 
-function toggleSound(){
-soundOn=!soundOn;
-document.getElementById("soundBtn").innerText =
-soundOn ? "🔊 Звук ВКЛ" : "🔇 Звук ВЫКЛ";
+function unlockSound(){
+const a=document.getElementById("alarm");
+a.play().then(()=>a.pause()).catch(()=>{});
+soundEnabled=true;
+document.getElementById("soundBtn").innerText="🔊 Звук ON";
 }
 
-/* TIME */
+function playSound(){
+if(!soundEnabled) return;
+const a=document.getElementById("alarm");
+a.currentTime=0;
+a.play().catch(()=>{});
+}
+
+/* ================= TIME ================= */
 
 function fmt(s){
 s=Math.max(0,s);
@@ -132,7 +134,7 @@ let diff=Math.floor((Date.now()-new Date(p.last_update))/1000);
 return Math.max(0,p.time-diff);
 }
 
-/* LOAD */
+/* ================= LOAD ================= */
 
 async function load(){
 const {data}=await db.from("timers").select("*");
@@ -140,21 +142,19 @@ const {data}=await db.from("timers").select("*");
 let newData={};
 (data||[]).forEach(p=>newData[p.name]=p);
 
-/* добавляем новых */
-for(let name in newData){
-if(!players[name]){
-createRow(newData[name]);
-}
-}
-
 players=newData;
+
+/* create missing rows only */
+for(let p of Object.values(players)){
+if(!document.getElementById("row_"+p.name)){
+createRow(p);
+}
+}
 }
 
-/* CREATE ROW ONCE */
+/* ================= CREATE ROW ONCE ================= */
 
 function createRow(p){
-
-if(document.getElementById("row_"+p.name)) return;
 
 let div=document.createElement("div");
 div.className="player";
@@ -183,7 +183,7 @@ p.running
 document.getElementById("list").appendChild(div);
 }
 
-/* UPDATE ONLY TIME (NO RESET UI) */
+/* ================= LIVE UPDATE ================= */
 
 function tick(){
 
@@ -192,56 +192,43 @@ let arr=Object.values(players)
 
 arr.forEach((p,i)=>{
 
-createRow(p);
-
 let t=remaining(p);
 
+/* safe update (NO 00 FLASH) */
 let el=document.getElementById("t_"+p.name);
 if(el) el.innerText=fmt(t);
 
+/* index */
 let row=document.getElementById("row_"+p.name);
 if(row){
 
 row.querySelector(".idx").innerText=i+1;
 
-row.classList.remove("warn","danger","flash");
+/* only color, NO flash */
+row.classList.remove("warn","danger");
 
 if(t<=300) row.classList.add("warn");
 if(t<=60) row.classList.add("danger");
-if(t<=30) row.classList.add("flash");
-
 }
 
+/* end */
 if(t<=0 && p.running){
 p.running=false;
 p.time=0;
 save(p);
-
-if(!fired[p.name]){
-fired[p.name]=true;
 playSound();
-}
 }
 
 });
 }
 
-/* SOUND */
-
-function playSound(){
-if(!soundOn) return;
-const a=document.getElementById("alarm");
-a.currentTime=0;
-a.play().catch(()=>{});
-}
-
-/* SAVE */
+/* ================= SAVE ================= */
 
 async function save(p){
 await db.from("timers").upsert(p);
 }
 
-/* ACTIONS */
+/* ================= ACTIONS ================= */
 
 async function addPlayer(){
 let name=document.getElementById("name").value.trim();
@@ -250,6 +237,7 @@ if(!name||!min) return;
 
 let p=players[name]||{name,time:0,running:false,last_update:null};
 
+/* FIX: no 00 bug */
 p.time=remaining(p)+min*60;
 p.running=true;
 p.last_update=new Date().toISOString();
@@ -295,7 +283,7 @@ delete players[name];
 document.getElementById("row_"+name)?.remove();
 }
 
-/* GLOBAL */
+/* ================= GLOBAL ================= */
 
 async function addAll(){
 let min=parseInt(document.getElementById("all").value,10);
@@ -338,12 +326,12 @@ players={};
 document.getElementById("list").innerHTML="";
 }
 
-/* INIT */
+/* ================= INIT ================= */
 
 async function init(){
 await load();
-setInterval(tick,1000);      // time update
-setInterval(load,3500);      // server sync (как ты просил 3–4 сек)
+setInterval(tick,1000);
+setInterval(load,3500);
 }
 
 init();
