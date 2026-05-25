@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2</title>
+<title>EXP L2 </title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -55,7 +55,6 @@ font-weight:bold;
 .danger{background:#3a0a0a}
 
 .actions{display:flex;gap:10px;margin-left:auto;flex-wrap:wrap}
-
 </style>
 </head>
 
@@ -98,29 +97,23 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
-let soundEnabled=false;
+let soundOn=false;
 let fired={};
 
 /* ================= SOUND ================= */
 
 function toggleSound(){
-soundEnabled=!soundEnabled;
-updateSoundUI();
+soundOn=!soundOn;
+document.getElementById("soundBtn").innerText = soundOn ? "🔊" : "🔇";
 
-/* unlock browser audio */
-if(soundEnabled){
+if(soundOn){
 const a=document.getElementById("alarm");
 a.play().then(()=>a.pause()).catch(()=>{});
 }
 }
 
-function updateSoundUI(){
-document.getElementById("soundBtn").innerText =
-soundEnabled ? "🔊" : "🔇";
-}
-
 function playSound(){
-if(!soundEnabled) return;
+if(!soundOn) return;
 const a=document.getElementById("alarm");
 a.currentTime=0;
 a.play().catch(()=>{});
@@ -152,7 +145,7 @@ let newData={};
 
 players=newData;
 
-/* create only new rows */
+/* create ONLY new rows */
 for(let p of Object.values(players)){
 if(!document.getElementById("row_"+p.name)){
 createRow(p);
@@ -160,7 +153,7 @@ createRow(p);
 }
 }
 
-/* ================= CREATE ROW ================= */
+/* ================= CREATE ================= */
 
 function createRow(p){
 
@@ -191,48 +184,49 @@ p.running
 document.getElementById("list").appendChild(div);
 }
 
-/* ================= LIVE UPDATE ================= */
+/* ================= UPDATE ONLY ================= */
+
+function update(p,i){
+
+let t=remaining(p);
+
+let row=document.getElementById("row_"+p.name);
+if(!row) return;
+
+/* index */
+row.querySelector(".idx").innerText=i+1;
+
+/* time */
+let el=document.getElementById("t_"+p.name);
+if(el) el.innerText=fmt(t);
+
+/* color */
+row.classList.remove("warn","danger");
+
+if(t<=300) row.classList.add("warn");
+if(t<=60) row.classList.add("danger");
+
+/* end */
+if(t<=0 && p.running){
+p.running=false;
+p.time=0;
+save(p);
+playSound();
+
+if(!fired[p.name]){
+fired[p.name]=true;
+}
+}
+}
+
+/* ================= TICK ================= */
 
 function tick(){
 
 let arr=Object.values(players)
 .sort((a,b)=>remaining(a)-remaining(b));
 
-arr.forEach((p,i)=>{
-
-createRow(p);
-
-let t=remaining(p);
-
-/* update time */
-let el=document.getElementById("t_"+p.name);
-if(el) el.innerText=fmt(t);
-
-/* index */
-let row=document.getElementById("row_"+p.name);
-if(row){
-
-row.querySelector(".idx").innerText=i+1;
-
-row.classList.remove("warn","danger");
-
-if(t<=300) row.classList.add("warn");
-if(t<=60) row.classList.add("danger");
-}
-
-/* end sound */
-if(t<=0 && p.running){
-p.running=false;
-p.time=0;
-save(p);
-
-if(!fired[p.name]){
-fired[p.name]=true;
-playSound();
-}
-}
-
-});
+arr.forEach((p,i)=>update(p,i));
 }
 
 /* ================= SAVE ================= */
@@ -269,8 +263,6 @@ let p=players[name];
 p.time=remaining(p)+v*60;
 p.running=true;
 p.last_update=new Date().toISOString();
-
-fired[name]=false;
 
 await save(p);
 await load();
@@ -348,7 +340,6 @@ async function init(){
 await load();
 setInterval(tick,1000);
 setInterval(load,3500);
-updateSoundUI();
 }
 
 init();
