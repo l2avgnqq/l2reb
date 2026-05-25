@@ -15,16 +15,8 @@ color:#fff;
 font-family:Arial;
 }
 
-.top{
-text-align:center;
-padding:20px;
-}
-
-.players{
-max-width:1000px;
-margin:auto;
-padding:10px;
-}
+.top{text-align:center;padding:20px}
+.players{max-width:1000px;margin:auto;padding:10px}
 
 .player{
 background:#162033;
@@ -35,26 +27,11 @@ display:flex;
 align-items:center;
 gap:12px;
 flex-wrap:wrap;
-transition:.2s;
 }
 
-.idx{
-width:30px;
-color:#9ca3af;
-font-weight:bold;
-}
-
-.name{
-width:140px;
-font-weight:bold;
-}
-
-.time{
-width:130px;
-color:#22c55e;
-font-size:20px;
-font-weight:bold;
-}
+.idx{width:30px;color:#9ca3af;font-weight:bold}
+.name{width:140px;font-weight:bold}
+.time{width:130px;color:#22c55e;font-size:20px;font-weight:bold}
 
 input{
 padding:8px;
@@ -71,17 +48,13 @@ border-radius:10px;
 border:none;
 cursor:pointer;
 font-weight:bold;
-transition:.15s;
 }
-
-button:hover{transform:scale(1.05)}
 
 .add{background:#3b82f6;color:#fff}
 .pause{background:#f59e0b}
 .resume{background:#22c55e}
 .del{background:#ef4444}
 .global{background:#334155;color:#fff}
-.sound{background:#6366f1;color:#fff}
 
 .warn{background:#2a1f00}
 .danger{background:#3a0a0a}
@@ -101,6 +74,11 @@ margin-left:auto;
 flex-wrap:wrap;
 }
 
+.sound{
+background:#6366f1;
+color:#fff;
+}
+
 </style>
 </head>
 
@@ -110,7 +88,7 @@ flex-wrap:wrap;
 
 <h2>EXP Lineage2</h2>
 
-<button class="sound" onclick="toggleSound()" id="soundBtn">🔊 Звук ВКЛ</button>
+<button class="sound" onclick="toggleSound()" id="soundBtn">🔊 Звук</button>
 
 <br><br>
 
@@ -151,7 +129,7 @@ let soundOn=true;
 function toggleSound(){
 soundOn=!soundOn;
 document.getElementById("soundBtn").innerText =
-soundOn ? "🔊 Звук ВКЛ" : "🔇 Звук ВЫКЛ";
+soundOn ? "🔊 Звук" : "🔇 Звук OFF";
 }
 
 function playSound(){
@@ -171,6 +149,8 @@ let sec=s%60;
 return `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
 }
 
+/* ===== FIXED LOGIC ===== */
+
 function remaining(p){
 if(!p.running) return p.time;
 let diff=Math.floor((Date.now()-new Date(p.last_update))/1000);
@@ -185,17 +165,45 @@ players={};
 (data||[]).forEach(p=>players[p.name]=p);
 }
 
-/* ===== CREATE DOM ONCE ===== */
+/* ===== RENDER ONCE ===== */
 
-function createRow(p){
-const div=document.createElement("div");
+function render(){
+
+const list=document.getElementById("list");
+list.innerHTML="";
+
+const arr=Object.values(players)
+.sort((a,b)=>remaining(a)-remaining(b));
+
+arr.forEach((p,i)=>{
+
+let t=remaining(p);
+
+let div=document.createElement("div");
 div.className="player";
 div.id="row_"+p.name;
 
+/* colors */
+if(t<=300) div.classList.add("warn");
+if(t<=60) div.classList.add("danger");
+if(t<=30) div.classList.add("flash");
+
+/* END TIMER */
+if(t<=0 && p.running){
+p.running=false;
+p.time=0;
+save(p);
+
+if(!fired[p.name]){
+fired[p.name]=true;
+playSound();
+}
+}
+
 div.innerHTML=`
-<div class="idx"></div>
+<div class="idx">${i+1}</div>
 <div class="name">${p.name}</div>
-<div class="time" id="t_${p.name}">0</div>
+<div class="time" id="t_${p.name}">${fmt(t)}</div>
 
 <div class="actions">
 
@@ -212,57 +220,20 @@ p.running
 </div>
 `;
 
-document.getElementById("list").appendChild(div);
+list.appendChild(div);
+});
 }
 
-/* ===== RENDER ONLY ON LOAD/CHANGE ===== */
-
-function renderAll(){
-const list=document.getElementById("list");
-list.innerHTML="";
-Object.values(players).forEach(p=>createRow(p));
-updateNumbers();
-}
-
-/* ===== LIVE UPDATE ===== */
+/* ===== LIVE UPDATE ONLY TIME ===== */
 
 function tick(){
 
-let arr=Object.values(players)
-.sort((a,b)=>remaining(a)-remaining(b));
-
-arr.forEach((p,i)=>{
+Object.values(players).forEach(p=>{
 
 let t=remaining(p);
 
-/* time */
-let tEl=document.getElementById("t_"+p.name);
-if(tEl) tEl.innerText=fmt(t);
-
-/* index FIX */
-let row=document.getElementById("row_"+p.name);
-if(row){
-row.querySelector(".idx").innerText=i+1;
-
-/* colors */
-row.classList.remove("warn","danger","flash");
-
-if(t<=300) row.classList.add("warn");
-if(t<=60) row.classList.add("danger");
-if(t<=30) row.classList.add("flash");
-}
-
-/* end */
-if(t<=0 && p.running){
-p.running=false;
-p.time=0;
-save(p);
-
-if(!fired[p.name]){
-fired[p.name]=true;
-playSound();
-}
-}
+let el=document.getElementById("t_"+p.name);
+if(el) el.innerText=fmt(t);
 
 });
 
@@ -277,6 +248,7 @@ await db.from("timers").upsert(p);
 /* ===== ACTIONS ===== */
 
 async function addPlayer(){
+
 let name=document.getElementById("name").value.trim();
 let min=parseInt(document.getElementById("min").value,10);
 if(!name||!min) return;
@@ -291,10 +263,11 @@ fired[name]=false;
 
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function addTime(name){
+
 let v=parseInt(document.getElementById("i_"+name).value,10);
 if(!v) return;
 
@@ -308,7 +281,7 @@ fired[name]=false;
 
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function pause(name){
@@ -317,7 +290,7 @@ p.time=remaining(p);
 p.running=false;
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function resume(name){
@@ -327,13 +300,13 @@ p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
 await load();
-renderAll();
+render();
 }
 
 async function del(name){
 await db.from("timers").delete().eq("name",name);
 delete players[name];
-renderAll();
+render();
 }
 
 /* ===== GLOBAL ===== */
@@ -350,7 +323,7 @@ await save(p);
 }
 
 await load();
-renderAll();
+render();
 }
 
 async function pauseAll(){
@@ -361,7 +334,7 @@ await save(p);
 }
 
 await load();
-renderAll();
+render();
 }
 
 async function resumeAll(){
@@ -373,20 +346,20 @@ await save(p);
 }
 
 await load();
-renderAll();
+render();
 }
 
 async function clearAll(){
 await db.from("timers").delete().gt("time",-1);
 players={};
-renderAll();
+render();
 }
 
 /* ===== INIT ===== */
 
 async function init(){
 await load();
-renderAll();
+render();
 setInterval(tick,1000);
 }
 
