@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2 </title>
+<title>EXP L2 -_-</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -48,6 +48,7 @@ font-weight:bold;
 .resume{background:#22c55e}
 .del{background:#ef4444}
 .global{background:#334155;color:#fff}
+.soundBtn{background:#6366f1;color:#fff}
 
 .warn{background:#2a1f00}
 .danger{background:#3a0a0a}
@@ -61,6 +62,11 @@ font-weight:bold;
 <div class="top">
 
 <h2>EXP L2</h2>
+
+<!-- 🔊 SOUND BUTTON (FIXED - ALWAYS PRESENT) -->
+<button id="soundBtn" class="soundBtn" onclick="toggleSound()">🔇</button>
+
+<br><br>
 
 <input id="name" placeholder="Имя">
 <input id="min" type="number" placeholder="Мин">
@@ -91,7 +97,27 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
+let soundOn=false;
 let fired={};
+
+/* ================= SOUND (FIXED) ================= */
+
+function toggleSound(){
+soundOn=!soundOn;
+document.getElementById("soundBtn").innerText = soundOn ? "🔊" : "🔇";
+
+if(soundOn){
+const a=document.getElementById("alarm");
+a.play().then(()=>a.pause()).catch(()=>{});
+}
+}
+
+function playSound(){
+if(!soundOn) return;
+const a=document.getElementById("alarm");
+a.currentTime=0;
+a.play().catch(()=>{});
+}
 
 /* ================= TIME ================= */
 
@@ -159,12 +185,12 @@ p.running
 
 list.appendChild(row);
 
-/* sound */
+/* sound trigger */
 if(p.r<=0 && p.running){
 p.running=false;
 p.time=0;
 save(p);
-playSound?.();
+playSound();
 
 if(!fired[p.name]){
 fired[p.name]=true;
@@ -242,57 +268,11 @@ await load();
 render();
 }
 
-/* ================= FIXED CLEAR ALL ================= */
+/* ================= CLEAR ================= */
 
 async function clearAll(){
-
 await db.from("timers").delete().neq("name","__none__");
-
-/* hard reset local state */
 players={};
-fired={};
-
-document.getElementById("list").innerHTML="";
-
-}
-
-/* ================= GLOBAL ================= */
-
-async function addAll(){
-let min=parseInt(document.getElementById("all").value,10);
-if(!min) return;
-
-for(let p of Object.values(players)){
-p.time=remaining(p)+min*60;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-}
-
-await load();
-render();
-}
-
-async function pauseAll(){
-for(let p of Object.values(players)){
-p.time=remaining(p);
-p.running=false;
-await save(p);
-}
-
-await load();
-render();
-}
-
-async function resumeAll(){
-for(let p of Object.values(players)){
-if(p.time<=0) continue;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-}
-
-await load();
 render();
 }
 
