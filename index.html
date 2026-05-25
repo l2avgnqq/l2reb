@@ -20,13 +20,19 @@ button{cursor:pointer}
 .pause{background:#f39c12}
 .resume{background:#2ecc71}
 .del{background:#e74c3c}
+.global{background:#6b7280;color:#fff}
 </style>
 </head>
 
 <body>
 
 <div class="top">
+
 <h2>EXP Lineage2</h2>
+
+<button onclick="unlockSound()">🔊 Включить звук</button>
+
+<br><br>
 
 <input id="name" placeholder="Имя">
 <input id="min" type="number" placeholder="Мин">
@@ -36,21 +42,58 @@ button{cursor:pointer}
 
 <input id="all" type="number" placeholder="+ всем минут">
 <button class="add" onclick="addAll()">+ всем</button>
+
+<br>
+
+<button class="global" onclick="pauseAll()">Пауза всем</button>
+<button class="global" onclick="resumeAll()">Старт всем</button>
+<button class="global" onclick="clearAll()">Очистить</button>
+
 </div>
 
 <div id="list" class="players"></div>
 
-<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+<audio id="alarm" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
 
 <script>
+
+/* ===== SUPABASE ===== */
 
 const SUPABASE_URL="https://mxwtlfkhykqegzytotlq.supabase.co";
 const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
+/* ===== DATA ===== */
+
 let players={};
 let fired={};
+let soundUnlocked=false;
+
+/* ===== SOUND ===== */
+
+function unlockSound(){
+    const a=document.getElementById("alarm");
+    a.play().then(()=>a.pause()).catch(()=>{});
+    soundUnlocked=true;
+    alert("Звук включен");
+}
+
+function playSound(){
+    const a=document.getElementById("alarm");
+    a.currentTime=0;
+
+    a.play().catch(()=>{
+
+        // fallback если браузер всё ещё блокирует
+        alert("ВРЕМЯ ВЫШЛО!");
+
+    });
+
+    document.title="⏰ TIME OUT";
+}
+
+/* ===== TIME ===== */
 
 function fmt(s){
     s=Math.max(0,s);
@@ -67,6 +110,8 @@ function remaining(p){
     return Math.max(0,p.time-diff);
 }
 
+/* ===== LOAD/SAVE ===== */
+
 async function load(){
     let {data}=await db.from("timers").select("*");
     players={};
@@ -76,6 +121,8 @@ async function load(){
 async function save(p){
     await db.from("timers").upsert(p);
 }
+
+/* ===== RENDER ===== */
 
 function render(){
 
@@ -89,14 +136,14 @@ function render(){
         let t=remaining(p);
 
         if(t<=0 && p.running){
+
             p.running=false;
             p.time=0;
             save(p);
 
             if(!fired[p.name]){
                 fired[p.name]=true;
-                document.getElementById("alarm").play();
-                alert("Время вышло: "+p.name);
+                playSound();
             }
         }
 
@@ -119,6 +166,8 @@ function render(){
     });
 }
 
+/* ===== ACTIONS ===== */
+
 async function addPlayer(){
 
     let name=document.getElementById("name").value.trim();
@@ -128,7 +177,7 @@ async function addPlayer(){
 
     let p=players[name]||{name,time:0,running:false,last_update:null};
 
-    p.time+=min*60;
+    p.time=remaining(p)+min*60;
     p.running=true;
     p.last_update=new Date().toISOString();
 
@@ -158,25 +207,19 @@ async function addTime(name){
 }
 
 async function pause(name){
-
     let p=players[name];
-
     p.time=remaining(p);
     p.running=false;
-
     await save(p);
     await load();
     render();
 }
 
 async function resume(name){
-
     let p=players[name];
     if(p.time<=0) return;
-
     p.running=true;
     p.last_update=new Date().toISOString();
-
     await save(p);
     await load();
     render();
@@ -188,23 +231,53 @@ async function del(name){
     render();
 }
 
-async function addAll(){
+/* ===== GLOBAL ===== */
 
+async function addAll(){
     let min=parseInt(document.getElementById("all").value,10);
     if(!min) return;
 
     for(let p of Object.values(players)){
-
         p.time=remaining(p)+min*60;
         p.running=true;
         p.last_update=new Date().toISOString();
-
         await save(p);
     }
 
     await load();
     render();
 }
+
+async function pauseAll(){
+    for(let p of Object.values(players)){
+        p.time=remaining(p);
+        p.running=false;
+        await save(p);
+    }
+
+    await load();
+    render();
+}
+
+async function resumeAll(){
+    for(let p of Object.values(players)){
+        if(p.time<=0) continue;
+        p.running=true;
+        p.last_update=new Date().toISOString();
+        await save(p);
+    }
+
+    await load();
+    render();
+}
+
+async function clearAll(){
+    await db.from("timers").delete().gt("time",-1);
+    players={};
+    render();
+}
+
+/* ===== INIT ===== */
 
 async function init(){
     await load();
