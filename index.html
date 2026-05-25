@@ -61,9 +61,9 @@ font-weight:bold;
 
 <div class="top">
 
-<h2>EXP L2 STABLE</h2>
+<h2>EXP L2</h2>
 
-<button onclick="toggleSound()" id="soundBtn" class="soundBtn">🔇</button>
+<button id="soundBtn" class="soundBtn" onclick="toggleSound()">🔇</button>
 
 <br><br>
 
@@ -96,8 +96,8 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
-let fired={};
 let soundOn=false;
+let fired={};
 
 /* ================= SOUND ================= */
 
@@ -134,31 +134,69 @@ let diff=Math.floor((Date.now()-new Date(p.last_update))/1000);
 return Math.max(0,p.time-diff);
 }
 
-/* ================= LOAD (ONLY DATA) ================= */
+/* ================= LOAD ================= */
 
 async function load(){
 const {data}=await db.from("timers").select("*");
 
-let newData={};
-(data||[]).forEach(p=>newData[p.name]=p);
-
-players=newData;
+players={};
+(data||[]).forEach(p=>players[p.name]=p);
 }
 
-/* ================= CREATE ONLY ONCE ================= */
+/* ================= RENDER + SORT FIX ================= */
 
-function ensureRows(){
+function render(){
 
-for(let p of Object.values(players)){
+let arr=Object.values(players)
+.map(p=>({
+...p,
+r:remaining(p)
+}))
+.sort((a,b)=>a.r-b.r); // 👈 SORT FIX
 
-if(!document.getElementById("row_"+p.name)){
-createRow(p);
+const list=document.getElementById("list");
+
+/* 👉 IMPORTANT: we DON'T delete DOM, only reorder */
+arr.forEach((p,i)=>{
+
+let row=document.getElementById("row_"+p.name);
+
+if(!row){
+row=createRow(p);
+list.appendChild(row);
+} else {
+/* move row to correct position */
+list.appendChild(row);
+}
+
+/* index */
+row.querySelector(".idx").innerText=i+1;
+
+/* time */
+row.querySelector(".time").innerText=fmt(p.r);
+
+/* colors */
+row.classList.remove("warn","danger");
+if(p.r<=300) row.classList.add("warn");
+if(p.r<=60) row.classList.add("danger");
+
+/* end sound */
+if(p.r<=0 && p.running){
+p.running=false;
+p.time=0;
+save(p);
+
+if(!fired[p.name]){
+fired[p.name]=true;
+playSound();
 }
 }
 
+});
+
 }
 
-/* ================= CREATE ROW ================= */
+/* ================= CREATE ================= */
 
 function createRow(p){
 
@@ -169,7 +207,7 @@ div.id="row_"+p.name;
 div.innerHTML=`
 <div class="idx">0</div>
 <div class="name">${p.name}</div>
-<div class="time" id="t_${p.name}">0</div>
+<div class="time">0</div>
 
 <div class="actions">
 
@@ -186,45 +224,7 @@ p.running
 </div>
 `;
 
-document.getElementById("list").appendChild(div);
-}
-
-/* ================= UPDATE ONLY TEXT ================= */
-
-function updateUI(){
-
-let arr=Object.values(players)
-.sort((a,b)=>remaining(a)-remaining(b));
-
-arr.forEach((p,i)=>{
-
-let t=remaining(p);
-
-let row=document.getElementById("row_"+p.name);
-if(!row) return;
-
-/* index */
-row.querySelector(".idx").innerText=i+1;
-
-/* time ONLY */
-let el=document.getElementById("t_"+p.name);
-if(el) el.innerText=fmt(t);
-
-/* color */
-row.classList.remove("warn","danger");
-if(t<=300) row.classList.add("warn");
-if(t<=60) row.classList.add("danger");
-
-/* end */
-if(t<=0 && p.running){
-p.running=false;
-p.time=0;
-save(p);
-playSound();
-}
-
-});
-
+return div;
 }
 
 /* ================= SAVE ================= */
@@ -250,7 +250,7 @@ fired[name]=false;
 
 await save(p);
 await load();
-ensureRows();
+render();
 }
 
 async function addTime(name){
@@ -265,6 +265,7 @@ p.last_update=new Date().toISOString();
 
 await save(p);
 await load();
+render();
 }
 
 async function pause(name){
@@ -273,6 +274,7 @@ p.time=remaining(p);
 p.running=false;
 await save(p);
 await load();
+render();
 }
 
 async function resume(name){
@@ -282,60 +284,37 @@ p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
 await load();
+render();
 }
 
 async function del(name){
 await db.from("timers").delete().eq("name",name);
 delete players[name];
-document.getElementById("row_"+name)?.remove();
-}
-
-/* ================= GLOBAL ================= */
-
-async function addAll(){
-let min=parseInt(document.getElementById("all").value,10);
-if(!min) return;
-
-for(let p of Object.values(players)){
-p.time=remaining(p)+min*60;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-}
-
 await load();
-ensureRows();
+render();
 }
 
-async function pauseAll(){
-for(let p of Object.values(players)){
-p.time=remaining(p);
-p.running=false;
-await save(p);
+async function clearAll(){
+await db.from("timers").delete().gt("time",-1);
+players={};
+render();
 }
 
+/* ================= SYNC ================= */
+
+async function sync(){
 await load();
-}
-
-async function resumeAll(){
-for(let p of Object.values(players)){
-if(p.time<=0) continue;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-}
-
-await load();
+render();
 }
 
 /* ================= INIT ================= */
 
 async function init(){
 await load();
-ensureRows();
+render();
 
-setInterval(load,3000);     // only data sync
-setInterval(updateUI,1000); // ONLY text update (NO DOM RESET)
+setInterval(sync,3000);
+setInterval(render,1000);
 }
 
 init();
