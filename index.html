@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXP L2 </title>
+<title>EXP L2 FIX</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -20,7 +20,6 @@ border-radius:12px;
 display:flex;
 align-items:center;
 gap:12px;
-flex-wrap:wrap;
 }
 
 .idx{width:30px;color:#9ca3af;font-weight:bold}
@@ -64,10 +63,6 @@ font-weight:bold;
 
 <h2>EXP L2</h2>
 
-<button id="soundBtn" class="soundBtn" onclick="toggleSound()">🔇</button>
-
-<br><br>
-
 <input id="name" placeholder="Имя">
 <input id="min" type="number" placeholder="Мин">
 <button class="add" onclick="addPlayer()">Добавить</button>
@@ -97,27 +92,7 @@ const SUPABASE_KEY="sb_publishable_-FajhSo3HLdy00i5VNemSA_89bLw5Qp";
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 
 let players={};
-let soundOn=false;
 let fired={};
-
-/* ================= SOUND ================= */
-
-function toggleSound(){
-soundOn=!soundOn;
-document.getElementById("soundBtn").innerText = soundOn ? "🔊" : "🔇";
-
-if(soundOn){
-const a=document.getElementById("alarm");
-a.play().then(()=>a.pause()).catch(()=>{});
-}
-}
-
-function playSound(){
-if(!soundOn) return;
-const a=document.getElementById("alarm");
-a.currentTime=0;
-a.play().catch(()=>{});
-}
 
 /* ================= TIME ================= */
 
@@ -140,31 +115,36 @@ return Math.max(0,p.time-diff);
 async function load(){
 const {data}=await db.from("timers").select("*");
 
-let newData={};
-(data||[]).forEach(p=>newData[p.name]=p);
-
-players=newData;
-
-/* create ONLY new rows */
-for(let p of Object.values(players)){
-if(!document.getElementById("row_"+p.name)){
-createRow(p);
-}
-}
+players={};
+(data||[]).forEach(p=>players[p.name]=p);
 }
 
-/* ================= CREATE ================= */
+/* ================= RENDER FULL (IMPORTANT FIX) ================= */
 
-function createRow(p){
+function render(){
 
-let div=document.createElement("div");
-div.className="player";
-div.id="row_"+p.name;
+let arr=Object.values(players)
+.sort((a,b)=>remaining(a)-remaining(b));
 
-div.innerHTML=`
-<div class="idx">0</div>
+const list=document.getElementById("list");
+
+/* FULL SYNC DOM ORDER FIX */
+list.innerHTML="";
+
+arr.forEach((p,i)=>{
+
+let t=remaining(p);
+
+let row=document.createElement("div");
+row.className="player";
+
+if(t<=300) row.classList.add("warn");
+if(t<=60) row.classList.add("danger");
+
+row.innerHTML=`
+<div class="idx">${i+1}</div>
 <div class="name">${p.name}</div>
-<div class="time" id="t_${p.name}">0</div>
+<div class="time">${fmt(t)}</div>
 
 <div class="actions">
 
@@ -181,58 +161,36 @@ p.running
 </div>
 `;
 
-document.getElementById("list").appendChild(div);
-}
+list.appendChild(row);
 
-/* ================= UPDATE ONLY ================= */
-
-function update(p,i){
-
-let t=remaining(p);
-
-let row=document.getElementById("row_"+p.name);
-if(!row) return;
-
-/* index */
-row.querySelector(".idx").innerText=i+1;
-
-/* time */
-let el=document.getElementById("t_"+p.name);
-if(el) el.innerText=fmt(t);
-
-/* color */
-row.classList.remove("warn","danger");
-
-if(t<=300) row.classList.add("warn");
-if(t<=60) row.classList.add("danger");
-
-/* end */
+/* sound */
 if(t<=0 && p.running){
 p.running=false;
 p.time=0;
 save(p);
-playSound();
 
 if(!fired[p.name]){
 fired[p.name]=true;
+playSound();
 }
 }
-}
 
-/* ================= TICK ================= */
+});
 
-function tick(){
-
-let arr=Object.values(players)
-.sort((a,b)=>remaining(a)-remaining(b));
-
-arr.forEach((p,i)=>update(p,i));
 }
 
 /* ================= SAVE ================= */
 
 async function save(p){
 await db.from("timers").upsert(p);
+}
+
+/* ================= SOUND ================= */
+
+function playSound(){
+const a=document.getElementById("alarm");
+a.currentTime=0;
+a.play().catch(()=>{});
 }
 
 /* ================= ACTIONS ================= */
@@ -252,46 +210,8 @@ fired[name]=false;
 
 await save(p);
 await load();
+render();
 }
-
-async function addTime(name){
-let v=parseInt(document.getElementById("i_"+name).value,10);
-if(!v) return;
-
-let p=players[name];
-
-p.time=remaining(p)+v*60;
-p.running=true;
-p.last_update=new Date().toISOString();
-
-await save(p);
-await load();
-}
-
-async function pause(name){
-let p=players[name];
-p.time=remaining(p);
-p.running=false;
-await save(p);
-await load();
-}
-
-async function resume(name){
-let p=players[name];
-if(p.time<=0) return;
-p.running=true;
-p.last_update=new Date().toISOString();
-await save(p);
-await load();
-}
-
-async function del(name){
-await db.from("timers").delete().eq("name",name);
-delete players[name];
-document.getElementById("row_"+name)?.remove();
-}
-
-/* ================= GLOBAL ================= */
 
 async function addAll(){
 let min=parseInt(document.getElementById("all").value,10);
@@ -305,41 +225,57 @@ await save(p);
 }
 
 await load();
+render();
 }
 
-async function pauseAll(){
-for(let p of Object.values(players)){
+async function pause(name){
+let p=players[name];
 p.time=remaining(p);
 p.running=false;
 await save(p);
-}
-
 await load();
+render();
 }
 
-async function resumeAll(){
-for(let p of Object.values(players)){
-if(p.time<=0) continue;
+async function resume(name){
+let p=players[name];
+if(p.time<=0) return;
 p.running=true;
 p.last_update=new Date().toISOString();
 await save(p);
+await load();
+render();
 }
 
+async function del(name){
+await db.from("timers").delete().eq("name",name);
+delete players[name];
 await load();
+render();
 }
 
 async function clearAll(){
 await db.from("timers").delete().gt("time",-1);
 players={};
-document.getElementById("list").innerHTML="";
+render();
+}
+
+/* ================= GLOBAL SYNC LOOP ================= */
+
+async function sync(){
+await load();
+render();
 }
 
 /* ================= INIT ================= */
 
 async function init(){
 await load();
-setInterval(tick,1000);
-setInterval(load,3500);
+render();
+
+/* FIX: stable sync (no freeze, no reload needed) */
+setInterval(sync,3000);
+setInterval(render,1000);
 }
 
 init();
